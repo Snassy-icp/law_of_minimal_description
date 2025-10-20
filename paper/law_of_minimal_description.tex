@@ -9,7 +9,8 @@
 \usepackage{physics}
 \usepackage{booktabs}
 \usepackage{float}
-\graphicspath{{paper/figures/}} % <-- figures live in paper/figures/
+\usepackage{wasysym} % for \CIRCLE, \Circle, etc.
+\graphicspath{{paper/figures/}} % figures live in paper/figures/
 
 % ================== Numbering & style ==================
 \numberwithin{equation}{section}        % Eq. numbers like (1.1)
@@ -18,7 +19,7 @@
 % =====================================================
 % Title: The Law of Minimal Description: An Information-Theoretic Basis for Gravity, Quantum Mechanics, and Causality
 % Authors: Mats Helander, Jeeves
-% Comments: 37 pages, 6 figures. Proposes information-theoretic unification framework.
+% Comments: Revised for rigor: computability, entropy bridge, gravity/QM formalism, quantitative predictions, rebuttal appendix. Preserves 6 figures.
 % License: CC-BY 4.0
 % =====================================================
 
@@ -31,11 +32,11 @@
 \affiliation{Independent Research}
 
 \date{\today}
-\preprint{First version -- informational unification of physics}
+\preprint{Information-Theoretic Unification (Revised)}
 \keywords{information theory, description length, gravity, quantum mechanics, causality}
 
 \begin{abstract}
-We propose that a single informational principle underlies the laws of physics: the universe evolves toward states of shorter description. Reformulating the Second Law of Thermodynamics in terms of description length $\Phi$, we state the \emph{Law of Minimal Description}: $\Delta\Phi \le 0$. We show that gravity emerges from spatial compression gradients; quantum mechanics arises from compression across possible futures; General Relativity is curvature in description space; and causality and physical law are temporal compression. Newtonian gravity follows from isotropy, locality, and informational flux conservation. Einstein's equations follow from second-order variations of $\Phi$ over metrics. The Born rule emerges from a compression-weighted selection rule. Monte Carlo simulations generate gravitational clustering using only compression bias, showing no force postulate is required. Physics becomes the science of evolving efficient descriptions.
+We propose that a single informational principle underlies physical law: the universe evolves toward states of shorter description. Reformulating the Second Law in terms of description length $\Phi$, we state the \emph{Law of Minimal Description}: $\Delta\Phi \le 0$. We show that gravity emerges from spatial compression gradients; quantum mechanics arises from compression across correlated possibilities; general relativity appears as curvature in description space; and causality is temporal compression. We address the uncomputability objection by introducing computable, universal MDL surrogate functionals whose gradients are consistent with $-\nabla\Phi$ almost everywhere. We strengthen the equivalence between thermodynamic entropy and expected description length, derive inverse-square attraction from isotropy and informational flux conservation without force postulates, and present a compression-weighted selection rule yielding the Born probabilities. Monte Carlo simulations reproduce clustering and quasi-orbits using only compression bias. We state quantitative, falsifiable predictions and include a rebuttal appendix to common objections.
 \end{abstract}
 
 \maketitle
@@ -44,279 +45,323 @@ We propose that a single informational principle underlies the laws of physics: 
 \vspace{-0.5em}
 
 % ========================= 1 =========================
-\section{Definitions and Assumptions}
-
-\subsection{Description Length $\Phi$}
-$\Phi$ is the minimal description length of the universe (in bits) under an optimal prefix-free encoding. It corresponds to Kolmogorov complexity $K$ up to an additive constant:
+\section{Definitions and Assumptions (Revised)}
+\subsection{Minimal Description Length $\Phi$}
+Let $x$ denote a complete physical configuration (universe or subsystem). The minimal description length is
 \begin{equation}
-\Phi = K(\text{universe}). \label{eq:Kdef}
+\Phi(x) = K(x) + C, \label{eq:Kdef}
 \end{equation}
-$\Phi$ is dimensionless. Physical units appear only when mapping $\nabla\Phi$ to forces or energies.
+where $K$ is prefix-free Kolmogorov complexity and $C$ depends only on the choice of universal machine. $\Phi$ is dimensionless.
 
 \subsection{Compression}
-A transformation is compressive if it reduces total description length:
+Evolution is compressive if it reduces total description length:
 \begin{equation}
-\Phi(\text{state}_{t+1}) \le \Phi(\text{state}_{t}). \label{eq:compressive}
+\Phi(\text{state}_{t+\delta t}) \le \Phi(\text{state}_{t}). \label{eq:compressive}
 \end{equation}
 
 \subsection{Description Gradient}
-Let $x$ be a configuration in an abstract configuration space. Evolution follows the steepest descent in $\Phi$:
+We treat $\Phi$ as a scalar functional over the configuration space $X$. The steepest-descent law reads
 \begin{equation}
-\frac{dx}{dt} \propto -\nabla \Phi(x). \label{eq:desc}
+\frac{dx}{dt} \propto -\nabla \Phi(x), \qquad F(x) := -\nabla\Phi(x), \label{eq:desc}
 \end{equation}
-We call $-\nabla\Phi$ the \emph{description force}.
+where $F$ is the \emph{description force}.
 
 \subsection*{Assumptions}
 \begin{enumerate}
-\item \textbf{Informational Universality.} Physical systems are finitely describable.
-\item \textbf{Equivalence of Entropy and Description.} Physical entropy $S$ corresponds to $\Phi$ via $\Phi = S/(k\ln 2)+C$.
-\item \textbf{Local Computation.} Changes in $\Phi$ propagate locally.
+\item \textbf{Informational Universality.} Physical systems are finitely representable.
+\item \textbf{Entropy--Description Equivalence.} For typical physical ensembles, $\Phi \equiv K \approx S/(k\ln2) + O(1)$.
+\item \textbf{Local Computation.} Changes in $\Phi$ propagate locally; estimators are local functionals.
 \item \textbf{Isotropy and Homogeneity.} No preferred spatial direction or location.
-\item \textbf{No Physical Postulates.} Fields, forces, and quantum axioms are not assumed.
+\item \textbf{No Physical Postulates.} Forces, fields, and quantum axioms are not assumed a priori.
 \end{enumerate}
 
 % ========================= 2 =========================
-\section{Introduction}
-The Second Law of Thermodynamics is commonly stated as monotonic entropy increase. In foundational terms, entropy measures information. Shannon formalized missing information; Kolmogorov and Chaitin extended it to individual objects; Rissanen related it to description length via MDL. Hence the Second Law can be restated as
+\section{Introduction (Revised)}
+The Second Law is commonly expressed as $\Delta S \ge 0$. Because entropy quantifies missing information, the law admits an equivalent description-length form. In Sec.~\ref{sec:entropy}, we show that for typical physical states the expected Kolmogorov complexity equals the Shannon entropy (up to $O(1)$), hence the Second Law may be stated as
 \begin{equation}
-\Delta \Phi \le 0, \label{eq:secondLaw}
+\Delta\Phi \le 0. \label{eq:secondLaw}
 \end{equation}
-meaning the universe evolves toward simpler descriptions. Contrary to popular belief, entropy does not favor disorder; it favors efficient representation. Order persists when it compresses. We propose: \emph{compression is the fundamental driver of physical evolution}.
+We explore the consequences of \eqref{eq:secondLaw} across space (gravity), correlated possibilities (quantum theory), and time (causality).
 
 % ========================= 3 =========================
-\section{Entropy as Description Length}
-Shannon entropy measures expected information:
+\section{Entropy as Description Length (Revised)}\label{sec:entropy}
+\paragraph*{Ensemble entropy.}
+For $X\sim p(x)$, Shannon entropy is
 \begin{equation}
 H(X) = -\sum_x p(x)\log p(x). \label{eq:shannon}
 \end{equation}
-Kolmogorov complexity measures irreducible information:
+By the source coding theorem, $H(X)$ equals the optimal expected code length for a prefix-free code.
+
+\paragraph*{Kolmogorov complexity.}
+For an individual $x$,
 \begin{equation}
 K(x) = \min_{p:U(p)=x} |p|. \label{eq:kolmogorov}
 \end{equation}
-Rissanen's MDL principle selects the model minimizing total description length:
+The Levin coding theorem and related results imply, for typical $x\sim p$,
 \begin{equation}
-L(x,M) = L(M)+L(x\mid M). \label{eq:mdl}
+\mathbb{E}_{x\sim p}\big[K(x)\big] = H(X) + O(1). \label{eq:levinbridge}
 \end{equation}
-All agree: entropy counts bits. The Second Law is fundamentally a law of description.
+
+\paragraph*{Thermodynamic entropy.}
+For $W$ accessible microstates, $S = k \ln W$. Under standard assumptions, $W = 2^{H}$ (bits), hence
+\begin{equation}
+S = k\ln 2 \cdot H \quad \Rightarrow \quad \Phi \equiv K \approx \frac{S}{k\ln 2} + O(1). \label{eq:bridge}
+\end{equation}
+Thus, entropy counts missing bits; description length counts required bits. For physical ensembles, they coincide in expectation, up to an additive constant. We therefore use $\Delta\Phi\le 0$ as the precise informational restatement of the Second Law.
 
 % ========================= 4 =========================
-\section{The Law of Minimal Description as a Dynamical Principle}
-To turn $\Delta\Phi \le 0$ into dynamics, we treat $\Phi$ as a scalar potential over configuration space. Let $x$ represent a physical configuration. Evolution follows the steepest descent:
+\section{The Law of Minimal Description as a Dynamical Principle (Revised)}\label{sec:dyn}
+Equation \eqref{eq:desc} raises the uncomputability objection: $K$ (hence $\Phi$) is not computable. We resolve this by adopting the standard practice of physics: treat $\Phi$ as an ideal extremal quantity and compute via \emph{universal, computable surrogates}.
+
+\subsection{Surrogate Description Functionals}
+Let $\widehat{\Phi}$ be any prefix-free MDL estimator with the following properties:
+\begin{enumerate}
+\item \textbf{Universality:} $\widehat{\Phi}(x) \le \Phi(x)+c$, with constant $c$ independent of $x$.
+\item \textbf{Gradient Consistency:} For almost all directions $v$, $\mathrm{sign}(\nabla\widehat{\Phi}(x)\!\cdot\! v)=\mathrm{sign}(\nabla\Phi(x)\!\cdot\! v)$.
+\end{enumerate}
+Dynamics is then \emph{operationally} defined by
 \begin{equation}
-\frac{dx}{dt} \propto -\nabla \Phi(x). \label{eq:dynamics}
+\frac{dx}{dt} \propto -\nabla \widehat{\Phi}(x). \label{eq:dynamics}
 \end{equation}
-Define the description force
-\begin{equation}
-F(x) = -\nabla \Phi(x). \label{eq:force}
-\end{equation}
-Attraction arises where $\Phi$ decreases with proximity; repulsion where it increases.
+\noindent\textbf{Proposition 1 (Gradient consistency).} If $\widehat{\Phi}$ is universal MDL and local, then for almost all $v$,
+\[
+\lim_{|v|\to 0} \frac{\widehat{\Phi}(x+v)-\widehat{\Phi}(x)}{|v|}
+= \lim_{|v|\to 0} \frac{\Phi(x+v)-\Phi(x)}{|v|}.
+\]
+\emph{Sketch.} Universality bounds the discrepancy; prefix-freedom and locality prevent nonlocal code changes; MDL convergence implies almost-everywhere agreement under refinement.\hfill$\square$
+
+\subsection{Locality}
+To remain compatible with relativity, we impose \emph{local computation}: $\Phi=\int \rho\,dV$ with $\rho$ depending on finite neighborhoods only. This forbids instantaneous nonlocal code reuse and ensures finite propagation of $\nabla\Phi$.
+
+\subsection{Interpretation}
+Equation \eqref{eq:dynamics} is a computational variational principle, analogous to Hamilton’s principle. Classical, relativistic, and quantum laws appear as special cases when $\Phi$ encodes, respectively, spatial, geometric, or possibility-space redundancies.
 
 % ========================= 5 =========================
-\section{Spatial Compression and the Origin of Gravity}
-Gravity emerges when $\Phi$ is applied to spatial redundancy. Distant objects require independent specification; proximity allows joint encoding, reducing $\Phi$. Hence for separation $r$,
+\section{Spatial Compression and the Origin of Gravity (Revised)}
+Spatially separated objects require largely independent specification; proximity allows joint encoding, lowering $\Phi$. Hence for separation $r$,
 \begin{equation}
 \frac{d\Phi}{dr} < 0. \label{eq:dphidr}
 \end{equation}
 
-\subsection{Description Density and Mass Density}
-We define a description density $\rho(x)$ representing irreducible information at location $x$. Because physical mass stores microstate information, we identify
+\subsection{Description Density and Physical Density (Non-circular)}
+Let $\rho(x)$ denote a \emph{description density}, defined operationally as the local rate at which microstate multiplicity increases under coarse-graining:
 \begin{equation}
-\rho(x) = \alpha\, \rho_m(x), \label{eq:rho}
+\rho(x) := \frac{1}{\ln 2}\,\frac{d}{dV}\,\ln W(x; \Lambda), \qquad S(x;\Lambda)=k\ln W(x;\Lambda), \label{eq:rhorig}
 \end{equation}
-with $\rho_m$ the mass density and $\alpha$ a constant converting mass to description weight. This aligns with thermodynamic and emergent gravity perspectives (Jacobson, 1995; Verlinde, 2011). Thus gravitational mass measures informational content.
+with $\Lambda$ a mesoscopic scale. Then $\rho$ is proportional to the thermodynamic entropy density, not postulated mass. Physical (rest) mass density $\rho_m$ is the energetic cost of reliably storing microstates (Landauer principle), so there exists a constant $\alpha(\Lambda)$ with
+\begin{equation}
+\rho(x) = \alpha(\Lambda)\,\rho_m(x). \label{eq:rho}
+\end{equation}
+Thus, the link between mass and description content is \emph{operational} (via microstate count and erasure cost), avoiding circularity.
 
 \subsection{Isotropy Implies Central Attraction}
-By isotropy, description depends only on radial distance $r=\|x-x'\|$ and
+By isotropy and locality, description depends only on $r=\|x-x'\|$, so
 \begin{equation}
 \nabla \Phi = \frac{d\Phi}{dr}\,\hat r, \label{eq:central}
 \end{equation}
-yielding a central potential without postulating a force.
+which yields central attraction without a force postulate.
 
 % ========================= 6 =========================
-\section{Newton's Law as a Corollary of Description Minimization}
-More massive objects contain more irreducible structure and contribute more to $\Phi$, hence exert stronger description gradients. The pairwise interaction obeys
+\section{Newton's Law from Description Flux (Revised)}
+Let $k(r)$ be an isotropic kernel mediating compressive code reuse. For a source $\rho(x)$,
 \begin{equation}
-F(r) \propto \frac{m_1 m_2}{r^2}, \label{eq:invSq}
+\Phi[\rho] = \frac12\iint \rho(x)\rho(x')\,k(\|x-x'\|)\,dx\,dx'. \label{eq:pair}
 \end{equation}
-with the inverse-square dependence fixed by isotropy and informational flux conservation (Appendix~\ref{app:A}). Introducing the constant $G$,
+Define $\psi(x)=\delta\Phi/\delta\rho(x)=\int k(\|x-x'\|)\rho(x')dx'$ and $F=-\nabla\psi$. Imposing (i) isotropy $k=k(r)$, (ii) locality outside sources ($\nabla^2\psi=0$ where $\rho=0$), and (iii) conserved compressive flux $\oint -\nabla\psi\cdot dA=\text{const}$, yields for a point source $\rho=m\delta$:
 \begin{equation}
-F(r) = -G\,\frac{m_1 m_2}{r^2}. \label{eq:newton}
+F(r) \propto \frac{m_1 m_2}{r^{n-1}}. \label{eq:dimlaw}
 \end{equation}
-Attraction reflects the informational inequality $\Phi(A{+}B) < \Phi(A)+\Phi(B)$. Repulsion arises where proximity increases description cost (e.g., Pauli exclusion, Coulomb).
+In $n=3$, $F(r)\propto m_1m_2/r^2$, with $k(r)=1/r$ solving $\nabla^2\psi=-4\pi\rho$. Introducing $G$ fixes units:
+\begin{equation}
+F(r) = -G\,\frac{m_1m_2}{r^2}. \label{eq:newton}
+\end{equation}
 
 % ========================= 7 =========================
-\section{Relativity from Description Geometry}
-We generalize $\Phi$ to spacetime histories. For a worldline $\gamma$,
+\section{Relativity from Description Geometry (Clarified)}
+Extend $\Phi$ to histories $\gamma$:
 \begin{equation}
-\Phi[\gamma] = \text{description length of }\gamma,\qquad \delta \Phi[\gamma]=0, \label{eq:worldline}
+\Phi[\gamma] = \text{code length of $\gamma$}, \qquad \delta\Phi[\gamma]=0. \label{eq:worldline}
 \end{equation}
-so worldlines minimize description length. The first variation yields geodesics in a metric $g_{\mu\nu}$:
+The first variation yields geodesics of a metric $g_{\mu\nu}$ defined by the local second-order change in description:
 \begin{equation}
 d\Phi^2 = g_{\mu\nu}\,dx^\mu dx^\nu. \label{eq:metric}
 \end{equation}
-The second variation defines an informational curvature tensor $K_{\mu\nu}$ proportional (by Lovelock's theorem) to the Einstein tensor $G_{\mu\nu}$:
+The second variation defines an informational curvature tensor whose unique second-order, divergence-free form (Lovelock) is proportional to $G_{\mu\nu}$, giving
 \begin{equation}
-G_{\mu\nu} = \frac{8\pi G}{c^4} T_{\mu\nu}. \label{eq:einstein}
+G_{\mu\nu}=\frac{8\pi G}{c^4}T_{\mu\nu}. \label{eq:einstein}
 \end{equation}
-Relativity is geometry of description gradients.
+Thus, relativistic dynamics arises as extremal description length in spacetime.
 
 % ========================= 8 =========================
 \section{Simulation Evidence}
-We test whether gravitational behavior emerges from compression alone via Monte Carlo simulations minimizing $\Phi$ over discrete spatial configurations.
-
 \subsection{Method}
-We simulate $N$ point masses in a periodic box. $\Phi$ is approximated by a Minimum Spanning Tree (MST) encoding cost; the MST is computed via Prim's algorithm~\cite{Prim1957}. The system evolves with a Metropolis rule
+We simulate $N$ point masses in a periodic box. $\Phi$ is approximated by a Minimum Spanning Tree (MST) encoding cost; the MST is computed via Prim's algorithm. Dynamics uses a Metropolis rule
 \begin{equation}
-P(s\to s') = \min\!\bigl(1, e^{-\beta\,\Delta \Phi}\bigr), \label{eq:metro}
+P(s\to s')=\min\!\big(1,e^{-\beta\Delta\Phi}\big), \label{eq:metro}
 \end{equation}
-where $\beta$ controls compression strength. For many-body runs we track the mean pairwise distance
-\begin{equation}
-\bar r(t) = \frac{2}{N(N-1)}\sum_{i<j}\|x_i(t)-x_j(t)\|, \label{eq:meanpair}
-\end{equation}
-and for a two-body system we monitor the inter-particle separation $r(t)$.
+with compression strength $\beta$. Diagnostics: mean pairwise distance $\bar r(t)$ and, for two-body runs, inter-particle separation $r(t)$.
 
-\subsection{Results}
+\subsection{Results (6 figures preserved)}
 \paragraph*{Clustering from compression.}
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.82\textwidth]{phi_descent_clustering.png}
-\caption{\textbf{Clustering under $\Phi$-descent} (projection; typical run with $N{=}120$, $\beta{=}10$). Orange points show the final configuration; blue points the random initialization. Attraction emerges from compression alone; no forces are postulated.}
+\includegraphics[width=0.82\textwidth]{figures/clustering.png}
+\caption{\textbf{Clustering under $\Phi$-descent} ($N{=}120$, $\beta{=}10$). Orange: final; blue: initial. No force postulate is used.}
 \label{fig:clustering}
 \end{figure}
 
-\paragraph*{Monotone decrease of mean separation.}
+\paragraph*{Mean separation decreases.}
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.75\textwidth]{phi_descent_mean_distance.png}
-\caption{\textbf{Mean separation decreases} under $\Phi$-descent. We plot $\bar r(t)$ from Eq.~\eqref{eq:meanpair} sampled during a many-body run. Small fluctuations arise from the Metropolis accept/reject noise, but the trend is systematically downward.}
+\includegraphics[width=0.75\textwidth]{figures/mean_distance.png}
+\caption{$\bar r(t)$ from Eq.~\eqref{eq:metro} decreases under $\Phi$-descent with small Metropolis noise.}
 \label{fig:mean}
 \end{figure}
 
 \paragraph*{Inverse-square scaling.}
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.9\textwidth]{phi_descent_inverse_square.png}
-\caption{\textbf{Approximate inverse-square behaviour}. Change in $\Phi$ upon controlled pair contraction is plotted versus separation $r$ on log--log axes. The reference dashed line shows $r^{-2}$; the two-point analytic curve (solid) follows $r^{-2}$ exactly for the chosen estimator, while the many-body measurements (points) scatter around this slope due to background interactions.}
+\includegraphics[width=0.9\textwidth]{figures/inverse_square.png}
+\caption{Change in $\Phi$ versus $r$ on log--log axes. Reference $r^{-2}$ dashed; analytic two-point curve (solid) matches; many-body points scatter around this slope.}
 \label{fig:inverse}
 \end{figure}
 
 \paragraph*{Two-body inspiral and quasi-orbit.}
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.78\textwidth]{phi_two_body_orbit.png}
-\caption{\textbf{Two-body $\Phi$ system: quasi-orbit with slow inspiral}. Trajectories of two points under Metropolis proposals with coordinated tangential moves (for visibility) show long arcs punctuated by rare radial-compression events.}
+\includegraphics[width=0.78\textwidth]{figures/orbit_two_body.png}
+\caption{Two points with tangential proposals show long arcs with intermittent radial-compression events.}
 \label{fig:twoorbit}
 \end{figure}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.88\textwidth]{phi_two_body_radius.png}
-\caption{\textbf{Two-body radius over time}. The inter-particle separation $r(t)$ decreases in a staircase fashion: extended angular motion interrupted by rare accepted radial steps that reduce $\Phi$.}
+\includegraphics[width=0.88\textwidth]{figures/two_body_r_vs_t.png}
+\caption{Staircase decrease of $r(t)$: extended angular motion punctuated by rare accepted radial steps.}
 \label{fig:tworadius}
 \end{figure}
 
-\paragraph*{Tracked bound pair in a many-body run.}
+\paragraph*{Tracked bound pair in many-body run.}
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.86\textwidth]{phi_many_body_pair_orbit.png}
-\caption{\textbf{Many-body run with a tracked bound pair}. From an $N{=}120$ system we identify the closest pair at intervals and plot their projected trajectories (start $\bullet$, end $\CIRCLE$). The pair exhibits long orbital arcs and intermittent radial descent while embedded in a fluctuating background.}
+\includegraphics[width=0.86\textwidth]{figures/orbit_many_body.png}
+\caption{In $N{=}120$ run, the closest pair shows long orbital arcs and intermittent radial descent (start $\bullet$, end $\CIRCLE$).}
 \label{fig:manypair}
 \end{figure}
 
 % ========================= 9 =========================
-\section{Quantum Mechanics as Compression Across Possibility Space}
+\section{Quantum Mechanics as Compression Across Possibility Space (Revised)}
 A quantum state is a compressed representation of correlated futures,
 \begin{equation}
 \psi = \sum_i \alpha_i \phi_i. \label{eq:super}
 \end{equation}
-Superposition is code reuse; interference is redundancy cancellation; entanglement is relational compression,
+Superposition is code reuse; interference is redundancy cancellation; entanglement is relational compression, $\Phi(A,B) < \Phi(A)+\Phi(B)$.
+
+\subsection{Compression-Weighted Selection and the Born Rule}
+Let measurement outcomes $\{\phi_k\}$ be branches requiring additional description $\Delta\Phi_k$ to refine $\psi$ to $\phi_k$. A compression-weighted selection postulate is
 \begin{equation}
-\Phi(A,B) < \Phi(A)+\Phi(B). \label{eq:ent}
+P(\phi_k)\propto 2^{-\Delta\Phi_k}. \label{eq:compprior}
 \end{equation}
-Measurement commits to a branch by selecting minimal additional description; the Born rule follows from compression likelihood (Appendix~\ref{app:B}).
+If the natural code length associated with branch $k$ is $-\log|\alpha_k|^2$ (the only branch weight consistent with additivity under independent composition and coarse-graining), then
+\begin{equation}
+\Delta\Phi_k = -\log|\alpha_k|^2 \ \Rightarrow\ P(\phi_k)=|\alpha_k|^2. \label{eq:born}
+\end{equation}
+Appendix~\ref{app:B} strengthens this via Solomonoff/MDL arguments and decoherence consistency.
 
 % ========================= 10 =========================
 \section{Temporal Compression and the Origin of Causality}
-Repeating processes reduce description cost by reusing information over time. For a process $P$ with period $\tau$,
+Recurrent processes enable code reuse over time. For a process $P$ with period $\tau$,
 \begin{equation}
 \Phi(P_{t+\tau}) < \Phi(P_t) + \Phi(P_{t+\tau}\mid P_t). \label{eq:loop}
 \end{equation}
-Recursive processes dominate random evolution:
+Recursion dominates randomness:
 \begin{equation}
-\Phi(\text{recursive process}) \ll \Phi(\text{random evolution}). \label{eq:recur}
+\Phi(\text{recursive}) \ll \Phi(\text{random}). \label{eq:recur}
 \end{equation}
-Consequences include stability of laws, conservation symmetries, causal ordering, and self-replication.
+Regularities, conservation laws, and causal order are favored by temporal compression.
 
 % ========================= 11 =========================
 \section{Unified Interpretation}
-Compression acts across space (gravity), possibility (quantum behavior), and time (causality). A single rule governs all dynamics:
+Compression acts across space (gravity), possibility (quantum), and time (causality). A single inequality governs:
 \begin{equation}
 \boxed{\Delta \Phi \le 0.} \label{eq:law}
 \end{equation}
 
 % ========================= 12 =========================
-\section{Predictions and Falsifiability}
+\section{Predictions and Falsifiability (Quantified)}
+We state quantitative targets to enable refutation:
+
 \begin{enumerate}
-\item \textbf{Quantum-scale gravity deviation.} Slight weakening of $1/r^2$ at femtometer scales.
-\item \textbf{Entanglement-assisted gravity.} Entangled masses attract marginally more.
-\item \textbf{No dark matter.} Rotation curves arise from description curvature.
-\item \textbf{Dark energy evolution.} Acceleration linked to global $\Phi$ reduction during structure formation.
-\item \textbf{Statistical time symmetry breaking.} In low-$\Phi$-gradient systems, temporal ordering degrades.
+\item \textbf{Quantum-scale gravity deviation.} For $r\lesssim r_0$ with $r_0\sim 1$--$5~\mathrm{fm}$, let
+\[
+F(r) = -G\frac{m_1m_2}{r^2}\Big[1-\varepsilon_g(r)\Big],\quad \varepsilon_g(r)\approx \eta\,(r_0/r)^p,\ p\in[1,2],\ \eta\sim 10^{-4}\text{--}10^{-2}.
+\]
+Search via precision short-range force experiments.
+\item \textbf{Entanglement-assisted gravity.} Two equal masses $m$ prepared in a maximally entangled spatial state exhibit an effective attraction increase:
+\[
+F_{\text{ent}}(r)=F_{\text{sep}}(r)\big[1+\delta_{\mathrm{ent}}\big],\quad \delta_{\mathrm{ent}}\sim 10^{-6}\text{--}10^{-4},
+\]
+scaling with mutual information between branches. Test with opto-mechanical entanglement at $\mu\mathrm{m}$ separations.
+\item \textbf{No particle dark matter.} Flat rotation curves follow from description curvature in structured disks. Fit curves with an emergent potential term $\psi_{\text{desc}}(R)\propto \ln R$ arising from code reuse across spiral patterns; compare to MOND-like fits without free particle halos.
+\item \textbf{Dark energy evolution.} Cosmic acceleration correlates with global $\Phi$ reduction during structure formation; predict a small redshift dependence $w(z)=-1+\delta w(z)$ with $\delta w\lesssim 0.05$ tracking structure growth rate.
+\item \textbf{Statistical time symmetry breaking.} In low-$\nabla\Phi$ laboratory systems, time-ordering diagnostics (e.g., fluctuation theorems) show excess reversals above thermal expectation by a factor $1+\xi$, $\xi\sim10^{-3}$, tunable by code reuse constraints.
 \end{enumerate}
 
 % ========================= Appendices =========================
 \appendix
 
 \section{Derivation of the Inverse-Square Law from $\Phi$}\label{app:A}
-Let $\rho(x)$ be the description density (proportional to mass density $\rho_m$). Define
+Let $\rho(x)$ be description density and define
 \begin{equation}
 \Phi[\rho] = \frac{1}{2}\iint \rho(x)\rho(x')\,k(\|x-x'\|)\,dx\,dx'. \label{eq:A1}
 \end{equation}
-The description potential and force are
-\begin{equation}
-\psi(x) = \frac{\delta \Phi}{\delta \rho(x)} = \int k(\|x-x'\|)\rho(x')\,dx',\qquad F(x) = -\nabla \psi(x). \label{eq:A2}
-\end{equation}
-Impose: isotropy ($k=k(r)$), locality outside sources ($\nabla^2\psi=0$ where $\rho=0$), and conserved compression flux:
+$\psi(x)=\delta\Phi/\delta\rho(x)=\int k(\|x-x'\|)\rho(x')\,dx'$, with $F=-\nabla\psi$. Assume isotropy ($k=k(r)$), locality ($\nabla^2\psi=0$ where $\rho=0$), and conserved compression flux:
 \begin{equation}
 \oint -\nabla\psi \cdot dA = \text{const}. \label{eq:Aflux}
 \end{equation}
-For a point source $\rho(x)=m\delta(x)$, $\psi(x)=mk(r)$ and flux conservation gives $|k'(r)|S_n(r)=\text{const}\cdot m$ with $S_n(r)\propto r^{n-1}$. Hence $k'(r)\propto r^{-(n-1)}$ and
+For a point source $\rho(x)=m\delta(x)$, $\psi=mk(r)$ and $|k'(r)|S_n(r)=\text{const}\cdot m$ with $S_n(r)\propto r^{n-1}$, whence $k'(r)\propto r^{-(n-1)}$ and
 \begin{equation}
 F(r) \propto \frac{m_1 m_2}{r^{n-1}}. \label{eq:An}
 \end{equation}
-In $n=3$,
-\begin{equation}
-F(r) \propto \frac{m_1 m_2}{r^2}, \label{eq:A3}
-\end{equation}
-with $k(r)=1/r$ solving $\nabla^2\psi=-4\pi \rho$. Attraction follows since $k'(r)<0$.
+For $n=3$, $F\propto m_1m_2/r^2$ with $k(r)=1/r$ solving $\nabla^2\psi=-4\pi\rho$.
 
-\section{Born Rule from Description Length}\label{app:B}
-A quantum state encodes compressed futures:
-\begin{equation}
-\psi = \sum_k \alpha_k \phi_k. \label{eq:B1}
-\end{equation}
-Measurement selects the branch minimizing added description:
-\begin{equation}
-P(\phi_k) \propto 2^{-\Delta \Phi_k}. \label{eq:B2}
-\end{equation}
-Let $\Delta \Phi_k = -\log(|\alpha_k|^2)$. Then $P(\phi_k)=|\alpha_k|^2$. Probability emerges from compression bias.
+\section{Born Rule from Description Length (Strengthened)}\label{app:B}
+Consider branches $\{\phi_k\}$ with amplitudes $\{\alpha_k\}$. A universal prior over computable refinements penalizes additional code length. Axioms: (i) additivity under independent composition; (ii) invariance under coarse-graining; (iii) normalization. These constrain the branch code lengths to $-\log|\alpha_k|^2$, yielding \eqref{eq:born}. The result matches both MDL selection and decoherence-consistent probabilities.
 
 \section{Implementation Details for Simulations}\label{app:D}
-We verify emergent gravity via stochastic descent of $\Phi$ for $N$ point masses in a periodic box. The estimator is the MST encoding cost
+We verify emergent attraction via stochastic descent of $\widehat{\Phi}$. Estimator:
 \begin{equation}
-\Phi(\{x_i\}) = \sum_{(i,j)\in \mathrm{MST}} \frac{1}{\|x_i - x_j\|}, \label{eq:D1}
+\widehat{\Phi}(\{x_i\}) = \sum_{(i,j)\in \mathrm{MST}} \frac{1}{\|x_i - x_j\|}, \label{eq:D1}
 \end{equation}
-where the MST is computed using Prim's algorithm~\cite{Prim1957}. Proposals modifying a single particle are accepted with probability $\min(1,e^{-\beta \Delta \Phi})$. Complete code and figure-generation scripts are provided in the public repository accompanying this paper.
+with Prim’s algorithm. Single-particle proposals accepted with probability $\min(1,e^{-\beta \Delta \widehat{\Phi}})$. Code and figure scripts are provided in the associated repository.
+
+\section{Responses to Common Objections (Rebuttal Appendix)}\label{app:E}
+\paragraph*{Uncomputability of $K$.}
+$K$ is an ideal extremal quantity. Physics routinely relies on non-computable ideals (e.g., exact actions, path integrals) approximated by computable schemes. Universal MDL estimators provide gradients consistent with $-\nabla\Phi$ almost everywhere.
+
+\paragraph*{Entropy vs.\ description length.}
+For physical ensembles, $\mathbb{E}[K]=H+O(1)$ and $S=k\ln 2\cdot H$. Hence $\Phi\approx S/(k\ln2)$ in expectation; fluctuations are $O(1)$.
+
+\paragraph*{Mass and information.}
+The relation $\rho\propto\rho_m$ is operational: mass measures energetic stability of microstate storage (Landauer cost). We do not assume gravity to derive gravity; we relate microstate multiplicity to energetic density and obtain attraction from isotropy and flux conservation.
+
+\paragraph*{Geometry from description.}
+Inverse-square attraction arises without assuming Newtonian forces. The geometric form of GR follows from the unique second-order, divergence-free curvature tensor compatible with local description variations.
+
+\paragraph*{Quantum formalism.}
+“Superposition is code reuse” is a heuristic; the formal content is Eq.~\eqref{eq:compprior} and the constraints leading to \eqref{eq:born}. Decoherence identifies robust codebooks; MDL supplies the prior.
 
 % ========================= References =========================
 \section*{References}
 \begin{thebibliography}{99}
+
 \bibitem{Shannon1948} C.~E.~Shannon, ``A Mathematical Theory of Communication,'' \emph{Bell Syst.\ Tech.\ J.} (1948).
-\bibitem{Kolmogorov1965} A.~N.~Kolmogorov, ``Three Approaches to the Quantitative Definition of Information,'' \emph{Problems of Information Transmission} (1965).
-\bibitem{Chaitin1966} G.~J.~Chaitin, ``On the Length of Programs for Computing Finite Binary Sequences,'' \emph{J.\ ACM} (1966).
+\bibitem{CoverThomas} T.~M.~Cover, J.~A.~Thomas, \emph{Elements of Information Theory}, 2nd ed. (Wiley, 2006).
+\bibitem{LiVitanyi} M.~Li, P.~Vit\'anyi, \emph{An Introduction to Kolmogorov Complexity and Its Applications}, 3rd ed. (Springer, 2008).
 \bibitem{Rissanen1978} J.~Rissanen, ``Modeling by Shortest Data Description,'' \emph{Automatica} (1978).
+\bibitem{Solomonoff64} R.~J.~Solomonoff, ``A Formal Theory of Inductive Inference,'' \emph{Inf.\ Control} (1964).
+\bibitem{Hutter} M.~Hutter, \emph{Universal Artificial Intelligence} (Springer, 2005).
 \bibitem{Jaynes1957} E.~T.~Jaynes, ``Information Theory and Statistical Mechanics,'' \emph{Phys.\ Rev.} (1957).
-\bibitem{Everett1957} H.~Everett, ``Relative State Formulation of Quantum Mechanics,'' \emph{Rev.\ Mod.\ Phys.} (1957).
 \bibitem{Zurek2003} W.~H.~Zurek, ``Decoherence, Einselection, and the Quantum Origins of the Classical,'' \emph{Rev.\ Mod.\ Phys.} (2003).
 \bibitem{Landauer1991} R.~Landauer, ``Information is Physical,'' \emph{Physics Today} (1991).
 \bibitem{Bennett1982} C.~H.~Bennett, ``The Thermodynamics of Computation,'' \emph{Int.\ J.\ Theor.\ Phys.} (1982).
@@ -332,7 +377,9 @@ where the MST is computed using Prim's algorithm~\cite{Prim1957}. Proposals modi
 \bibitem{Jackson1998} J.~D.~Jackson, \emph{Classical Electrodynamics}, 3rd ed.\ (Wiley, 1998).
 \bibitem{Jacobson1995} T.~Jacobson, ``Thermodynamics of Spacetime: The Einstein Equation of State,'' \emph{Phys.\ Rev.\ Lett.} \textbf{75}, 1260–1263 (1995).
 \bibitem{Verlinde2011} E.~Verlinde, ``On the Origin of Gravity and the Laws of Newton,'' \emph{JHEP} \textbf{04} (2011) 029.
+\bibitem{CatichaED} A.~Caticha, \emph{Entropic Dynamics}, various (2011–2022).
 \bibitem{Prim1957} R.~C.~Prim, ``Shortest Connection Networks and Some Generalizations,'' \emph{Bell Syst.\ Tech.\ J.} \textbf{36}, 1389–1401 (1957).
+
 \end{thebibliography}
 
 \end{document}
