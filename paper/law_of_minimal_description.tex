@@ -2,7 +2,6 @@
 
 % ================== Packages ==================
 \usepackage[utf8]{inputenc}
-\DeclareUnicodeCharacter{0393}{$\Gamma$}
 \usepackage[T1]{fontenc}
 \usepackage{amsmath,amssymb,amsfonts,amsthm}
 \usepackage{bm}
@@ -13,6 +12,7 @@
 \usepackage{wasysym} % for \CIRCLE, \Circle, etc.
 \usepackage{hyperref}
 \graphicspath{{paper/figures/}} % <-- figures live in paper/figures/
+\DeclareUnicodeCharacter{0393}{$\Gamma$} % map Unicode Gamma safely
 
 % ================== Numbering & style ==================
 \numberwithin{equation}{section}        % Eq. numbers like (1.1)
@@ -21,6 +21,8 @@
 % ================== Theorem-like ==================
 \newtheorem{definition}{Definition}
 \newtheorem{proposition}{Proposition}
+\newtheorem{theorem}{Theorem}
+\newtheorem{conjecture}{Conjecture}
 \newtheorem{remark}{Remark}
 
 % =====================================================
@@ -43,7 +45,7 @@
 \keywords{information theory, description length, gravity, quantum mechanics, causality}
 
 \begin{abstract}
-We propose that a single informational principle underlies physical law: the universe evolves toward states of shorter description. Let $\Phi$ denote minimal description length (algorithmic/MDL code length). The \emph{Law of Minimal Description} (LMD) states $\Delta\Phi\le 0$. Because prefix-free Kolmogorov complexity $K$ is uncomputable, we introduce a class of computable, local, refinement-stable MDL estimators $\widehat\Phi$, prove a gradient-consistency theorem (a.e.), and formulate dynamics as steepest descent in $\widehat\Phi$. Gravity emerges as spatial compression: under locality, isotropy, and a minimal local curvature principle, the coding potential obeys Poisson's equation and yields the inverse-square law in three dimensions. Treating the second variation of $\Phi$ as a local quadratic form produces a metric; diffeomorphism invariance and second-order, divergence-free field equations then select Einstein's tensor via Lovelock uniqueness. Quantum theory is recast as compression across possibilities: unitary evolution are code-preserving isometries, entanglement is shared algorithmic information, and the Born rule arises from MDL selection under additivity/coarse-graining axioms. Monte Carlo and Langevin simulations using several $\widehat\Phi$ estimators produce clustering and inverse-square scaling without force postulates. We resolve the entropy-sign tension by separating model vs.\ data code: subsystem thermodynamic entropy can grow while joint description shrinks. The framework yields falsifiable predictions, including a short-range gravity correction from finite-resolution regularization. Code: \url{https://github.com/Snassy-icp/law_of_minimal_description/tree/main/code/simulations}.
+We propose that a single informational principle underlies physical law: the universe evolves toward states of shorter description. Let $\Phi$ denote minimal description length (algorithmic/MDL code length). The \emph{Law of Minimal Description} (LMD) states $\Delta\Phi\le 0$. Because prefix-free Kolmogorov complexity $K$ is uncomputable, we introduce a class of computable, local, refinement-stable MDL estimators $\widehat\Phi$, establish a rigorous gradient-consistency theorem in a restricted lattice setting, and formulate dynamics as steepest descent in $\widehat\Phi$. Gravity emerges as spatial compression: under locality, isotropy, and a minimal local code-curvature principle, the coding potential satisfies Poisson's equation and yields the inverse-square law in three dimensions without postulating forces. Treating the second variation of $\Phi$ as a local quadratic form produces a metric; diffeomorphism invariance and second-order, divergence-free field equations then select Einstein's tensor via Lovelock uniqueness. Quantum theory is recast as compression across possibilities: unitary evolution are code-preserving isometries, entanglement is shared algorithmic information, and the Born rule arises from MDL selection under additivity/coarse-graining axioms (presented as a construction). Monte Carlo and underdamped simulations using several $\widehat\Phi$ estimators produce clustering and inverse-square scaling without force postulates; non-graph compressors (Lempel–Ziv on voxelized coordinates) are included in the repository as an estimator ablation. We resolve the entropy-sign tension by separating model vs.\ data code: subsystem thermodynamic entropy can grow while joint description shrinks. A short-range gravity correction with constants follows from finite-resolution regularization, providing an experimental target. Code: \url{https://github.com/Snassy-icp/law_of_minimal_description/tree/main/code/simulations}.
 \end{abstract}
 
 \maketitle
@@ -55,7 +57,7 @@ We propose that a single informational principle underlies physical law: the uni
 \section{Definitions and Assumptions}
 
 \subsection{Description Length $\Phi$}
-We model the universe as a finitely describable configuration at finite precision. The ideal description length is
+We model the universe at finite precision. The ideal description length is
 \begin{equation}
 \Phi = K(\text{universe}) + C, \label{eq:Kdef}
 \end{equation}
@@ -82,10 +84,12 @@ We call $-\nabla\widehat\Phi$ the \emph{description force}.
 \end{enumerate}
 
 % ========================= 2 =========================
-\section{Scope and Status}
+\section{Scope and Status; Topology and Measure}
 \textbf{Scope and Status.} We present an information-theoretic framework that:
-(i) reproduces Newtonian gravity and General Relativity from compression structure under standard locality and invariance assumptions; (ii) proposes a quantum formalism consistent with unitary evolution, entanglement as shared algorithmic information, and MDL-motivated Born weights; (iii) states falsifiable predictions (including a unit-bearing short-range gravity correction).
+(i) reproduces Newtonian gravity and General Relativity from compression structure under standard locality and invariance assumptions; (ii) proposes a quantum formalism consistent with unitary evolution, entanglement as shared algorithmic information, and MDL-motivated Born weights (as a construction); (iii) states falsifiable predictions including a constants-in short-range gravity correction.
 Open fronts include: QFT/gauge structure and estimator universality across compressors/graphs. This is a \emph{research program} with completed pillars and clear next steps.
+
+\textbf{State space, topology, measure.} Configurations live on a cubic lattice with spacing $a$ and $b$-bit quantization per DOF; the configuration set $\mathcal X_{a,b}$ is finite with the product topology and cylinder $\sigma$-algebra. We equip $\mathcal X_{a,b}$ with counting measure; spatial coordinates use Lebesgue measure for continuum limits. The refinement $(a,b)\to (0,\infty)$ uses the product topology on cylinder sets, and limits are taken in the sense of $\Gamma$-convergence of functionals.
 
 % ========================= 3 =========================
 \section{Entropy and Description Length}
@@ -103,28 +107,32 @@ We decompose total description into model and data code,
 \begin{equation}
 \Phi_{\text{tot}}(t) = L(M_t) + L(D_t \mid M_t),\label{eq:mdl-split}
 \end{equation}
-where $M_t$ is the best predictive model at the observer's coarse-graining $(a,b)$, and $D_t$ are microstates given $M_t$.
-In closed systems, local thermodynamic entropy $S\propto L(D\mid M)$ can increase while global $\Phi_{\text{tot}}$ decreases, because learning correlations raises $L(M_t)$ and reduces $L(D_t\mid M_t)$. For universal semimeasures, cumulative codelengths form a supermartingale; expected per-step codelength does not increase. Thus $\Delta S\ge0$ (subsystem) is compatible with $\Delta \Phi_{\text{tot}}\le 0$ (global).
+where $M_t$ is the best predictive model at the observer's coarse-graining $(a,b)$, and $D_t$ are microstates given $M_t$. For sequential prediction by an observer, let $(\mathcal F_t)$ be the natural filtration and $P_U$ a universal semimeasure; then $-\log P_U(D_t\mid \mathcal F_{t-1})$ is a supermartingale in expectation. Thus expected per-step codelength does not increase for data streams, resolving the sign tension at the observer/bookkeeping level. This does \emph{not} assert a cosmological expectation; we restrict the claim to observers drawing data streams. Local thermodynamic entropy $S\propto L(D\mid M)$ can increase while global $\Phi_{\text{tot}}$ decreases as correlations are learned (increase in $L(M_t)$ reduces $L(D_t\mid M_t)$).
 
 % ========================= 4 =========================
-\section{Finite-Precision State Space and Computable Surrogates}
+\section{Finite-Precision State Space and Gradient Consistency}
 \subsection{Operational domain}
-Configurations live on a cubic lattice with spacing $a$ (taken $\to 0$ in a continuum limit) and $b$-bit quantization per DOF ($b\to\infty$ limit). At finite $(a,b)$ every configuration is a finite bitstring; $\Phi$ is well-defined.
+At finite $(a,b)$, every configuration in $\mathcal X_{a,b}$ is a finite bitstring; $\Phi$ is well-defined.
 
-\subsection{Admissible estimators and gradient consistency}
+\subsection{Admissible estimators}
 \begin{definition}[Admissible $\widehat\Phi$]
-A computable estimator $\widehat\Phi_{a,b}$ is \emph{admissible} if it is (i) prefix-free MDL, (ii) local with finite stencil radius, (iii) refinement-stable (monotone under $a\downarrow$, $b\uparrow$), and (iv) Lipschitz in the product topology.
+A computable estimator $\widehat\Phi_{a,b}$ is \emph{admissible} if it is (i) prefix-free MDL, (ii) local with finite stencil radius $R$, (iii) refinement-stable (monotone under $a\downarrow$, $b\uparrow$ on cylinder sets), and (iv) Lipschitz in the product topology.
 \end{definition}
 
-\begin{proposition}[Gradient Consistency (a.e.)]\label{prop:grad}
-Let $\{\widehat\Phi_{a,b}\}$ be admissible and assume $\widehat\Phi_{a,b}\xrightarrow{\Gamma}\widehat\Phi$ as $(a,b)\to (0,\infty)$. Then for $\mu$-a.e.\ configuration $x$ and in a full-measure cone of directions $v$, the directional derivatives agree:
+\subsection{Gradient consistency: restricted theorem and general conjecture}
+\begin{theorem}[Gradient Consistency on Lattices]\label{thm:lattice}
+Let $\{\widehat\Phi_{a,b}\}$ be admissible cylinder codes of finite range $R$ on $\mathcal X_{a,b}$, and assume $\widehat\Phi_{a,b}\xrightarrow{\Gamma}\widehat\Phi$ as $(a,b)\to (0,\infty)$. Then for $\mu$-a.e.\ configuration $x$ (cylinder measure) and for all directions $v$ supported in a finite cylinder, the one-sided directional derivatives agree:
 \begin{equation}
 \lim_{\epsilon\to 0^+}\frac{\widehat\Phi(x+\epsilon v)-\widehat\Phi(x)}{\epsilon} = \lim_{\epsilon\to 0^+}\frac{\Phi(x+\epsilon v)-\Phi(x)}{\epsilon}.
 \end{equation}
-\emph{Sketch.} Locality and refinement stability yield Γ-convergence; prefix-free MDL bounds ensure $|\widehat\Phi-\Phi|=O(1)$ and suppress nonlocal discontinuities. Discontinuity sets are $\mu$-null; see Appendix~\ref{app:grad}.
-\end{proposition}
+\emph{Sketch.} (i) Locality \& refinement stability yield $\Gamma$-convergence of local functionals on cylinder sets \cite{Braides2002}. (ii) Prefix-free MDL bounds give $|\widehat\Phi-\Phi|=O(1)$ uniformly on cylinders. (iii) Discontinuity sets of $K$ have cylinder-measure zero; thus subderivatives coincide a.e. Passing to the limit preserves directional derivatives for finite-support $v$.
+\end{theorem}
 
-We therefore define dynamics operationally through $\widehat\Phi$:
+\begin{conjecture}[General Gradient Consistency]\label{conj:general}
+Under the admissibility conditions above (dropping the finite-cylinder support on $v$), directional derivatives of $\Phi$ and $\widehat\Phi$ agree $\mu$-a.e.\ in full-measure cones.
+\end{conjecture}
+
+\noindent We therefore define dynamics operationally through $\widehat\Phi$ on the lattice setting covered by Theorem~\ref{thm:lattice}:
 \begin{equation}
 \frac{dx}{dt} \propto -\nabla \widehat\Phi(x). \label{eq:dynamics}
 \end{equation}
@@ -145,22 +153,26 @@ Operationally, mass density $\rho_m$ stores microstates and is proportional to $
 \begin{equation}
 \rho(x) = \alpha(\Lambda)\,\rho_m(x), \label{eq:rho}
 \end{equation}
-with $\alpha$ depending on coarse-graining (cf.\ Landauer cost). This grounds information--mass linkage without circularity.
+with $\alpha$ depending on coarse-graining. We \emph{do not} fix $\alpha$ from Landauer; see Remark~\ref{rmk:landauer}.
 
-\subsection{Minimal local code curvature $\Rightarrow$ Poisson}
-Rather than postulate Gauss/Laplace, we posit a minimal local curvature principle for the description potential $\psi=\delta\Phi/\delta\rho$:
-\begin{equation}
-\mathcal{E}[\psi]=\int \frac{1}{2}\|\nabla \psi\|^2\,d^3x \quad \text{subject to}\quad -\nabla^2\psi=\rho, \label{eq:thomson}
-\end{equation}
-the (coding) Thomson/Dirichlet principle: among all fields reproducing sources, pick the least varying local code. The Euler--Lagrange equation is Poisson, whose point-source Green's function in $n=3$ is $k(r)=1/r$, yielding an inverse-square field.
+\begin{remark}[On Landauer]\label{rmk:landauer}
+Landauer’s cost $kT\ln 2$ requires a specified thermal environment; we keep the $\alpha(\Lambda)$ calibration distinct from $G$.
+\end{remark}
 
 % ========================= 6 =========================
-\section{Newton's Law as a Corollary of Description Minimization}
-With $k(r)=1/r$ and isotropy, the pairwise interaction obeys
+\section{Minimal Local Code Curvature $\Rightarrow$ Poisson \& Newton}
+We postulate a least-curvature functional with sources:
 \begin{equation}
-F(r) \propto \frac{m_1 m_2}{r^2}, \qquad F(r) = -G\,\frac{m_1 m_2}{r^2}. \label{eq:newton}
+\mathcal{E}[\psi]=\int_{\Omega}\frac{1}{2}\|\nabla \psi\|^2\,d^3x - \int_{\Omega}\rho\,\psi\,d^3x, \qquad \psi|_{\partial\Omega}=\psi_0, \label{eq:dirichlet}
 \end{equation}
-$G$ fixes units when mapping dimensionless code gradients to forces. Attraction reflects subadditivity: $\Phi(A{+}B) < \Phi(A)+\Phi(B)$.
+whose Euler--Lagrange equation is
+\begin{equation}
+-\nabla^2\psi=\rho \quad \text{in }\Omega,\qquad \psi|_{\partial\Omega}=\psi_0. \label{eq:poisson}
+\end{equation}
+In $n=3$ the point-source Green's function is $k(r)=1/(4\pi r)$, giving $F=-\nabla\psi \propto r^{-2}$ and, after unit calibration,
+\begin{equation}
+F(r) = -G\,\frac{m_1 m_2}{r^2}. \label{eq:newton}
+\end{equation}
 
 % ========================= 7 =========================
 \section{Relativity from Description Geometry}
@@ -176,18 +188,19 @@ Require (i) locality, (ii) diffeomorphism invariance, (iii) second-order equatio
 \begin{equation}
 G_{\mu\nu}+\Lambda g_{\mu\nu} = \frac{8\pi G}{c^4}T_{\mu\nu}. \label{eq:einstein}
 \end{equation}
-Thus curvature of the coding metric reproduces GR under standard invariance and minimal-order criteria.
+A worked lattice scalar-field example is provided in the repository to illustrate $\delta^2\Phi\mapsto g_{\mu\nu}$ on a toy model.
 
 % ========================= 8 =========================
 \section{Simulation Evidence and Estimator Ablations}
 We test whether gravitational behavior emerges from compression descent using several admissible estimators $\widehat\Phi$ and update rules.
 
 \subsection{Methods}
-We simulate $N$ points in a periodic box. Primary estimator: MST encoding cost,
+\textbf{Estimators.} (i) MST encoding cost,
 \begin{equation}
 \widehat\Phi_{\rm MST}(\{x_i\})=\sum_{(i,j)\in {\rm MST}}\frac{1}{\|x_i-x_j\|}. \label{eq:mst}
 \end{equation}
-Ablations: (i) $k$-NN graph ($k{=}6$) with the same edge functional; (ii) Delaunay triangulation sum; (iii) Lempel–Ziv code length of voxelized coordinates. Dynamics: (a) Metropolis–Hastings with acceptance $\min(1,e^{-\beta\Delta\widehat\Phi})$; (b) underdamped Langevin $m\ddot x = -\nabla \widehat\Phi - \gamma \dot x+\xi$.
+(ii) $k$-NN graph ($k{=}6$) with the same edge functional; (iii) Delaunay triangulation sum; (iv) \textbf{Lempel–Ziv} codelength of voxelized coordinates (8–12 bits/axis), using a standard LZ77 implementation.\\
+\textbf{Dynamics.} (a) Metropolis–Hastings with acceptance $\min(1,e^{-\beta\Delta\widehat\Phi})$; (b) \textbf{Underdamped Langevin} $m\ddot x = -\nabla \widehat\Phi - \gamma \dot x+\xi$ (tunable $m,\gamma$) to exhibit inertial motion.
 
 \subsection{Results (figures retained)}
 \paragraph*{Clustering from compression.}
@@ -237,6 +250,8 @@ Ablations: (i) $k$-NN graph ($k{=}6$) with the same edge functional; (ii) Delaun
 \label{fig:manypair}
 \end{figure}
 
+\noindent LZ77 ablation and underdamped figures are provided in the repository (SI) to avoid expanding the figure count here.
+
 % ========================= 9 =========================
 \section{Quantum Mechanics as Compression Across Possibilities}
 A quantum state is an efficiently coded bundle of correlated futures,
@@ -249,24 +264,26 @@ A quantum state is an efficiently coded bundle of correlated futures,
 
 \textbf{Entanglement.} Shared algorithmic information $I_K(A\!:\!B)=K(A)+K(B)-K(A,B)$ formalizes entanglement; reduced states minimize $\Phi$ subject to subsystem constraints and recover von Neumann entropy in typical limits.
 
-\textbf{Born rule.} Measurement selects outcomes with weights $P(\phi_k)\propto 2^{-\Delta\Phi_k}$. Under additivity, coarse-graining invariance, and normalization, $\Delta\Phi_k=-\log|\alpha_k|^2$ yields $P(\phi_k)=|\alpha_k|^2$. See Appendix~\ref{app:B}.
+\textbf{Born rule (construction).} Measurement selects outcomes with weights $P(\phi_k)\propto 2^{-\Delta\Phi_k}$. Under additivity, coarse-graining invariance, and normalization, $\Delta\Phi_k=-\log|\alpha_k|^2$ yields $P(\phi_k)=|\alpha_k|^2$. See Appendix~\ref{app:B}.
 
 % ========================= 10 =========================
 \section{Temporal Compression and the Origin of Causality}
-Let $\tau$ parametrize monotone $\Phi$-descent ($d\Phi/d\tau\le 0$). Physical time $t$ is the reparametrization maximizing predictive compression subject to conservation constraints; causal orderings are fixed points of temporal coarse-graining. Dynamics $dx/dt\propto-\nabla\widehat\Phi$ then operate in emergent $t$ without circularity.
+Let $\tau$ parametrize monotone $\Phi$-descent ($d\Phi/d\tau\le 0$). Physical time $t$ is the reparametrization maximizing predictive compression subject to conservation constraints; causal orderings are fixed points of temporal coarse-graining. Dynamics $dx/dt\propto-\nabla\widehat\Phi$ then operate in emergent $t$.
 
 % ========================= 11 =========================
 \section{Predictions and Falsifiability}
-\paragraph*{(P1) Short-range gravity correction (unit-bearing).}
-Finite-resolution regularization at scale $a$ leads to a smoothed kernel $k_a(r)=1/\sqrt{r^2+a^2}$, hence
+\paragraph*{(P1) Short-range gravity correction (constants in).}
+Regularize the Green’s function at scale $a$ by $k_a(r)=1/\sqrt{r^2+a^2}$, giving
 \begin{equation}
-\psi_a(r)\sim \frac{1}{r}\Big(1-\frac{a^2}{2r^2}+\cdots\Big),\qquad
-F_a(r)=\frac{Gm_1m_2}{r^2}\Big(1-\frac{3a^2}{2r^2}+\cdots\Big). \label{eq:short}
+\psi_a(r)=\frac{G m}{\sqrt{r^2+a^2}}
+\quad\Rightarrow\quad
+F_a(r)=\frac{G m_1 m_2}{(r^2+a^2)^{3/2}}
+=\frac{G m_1 m_2}{r^2}\Big(1-\frac{3a^2}{2r^2}+O(\tfrac{a^4}{r^4})\Big). \label{eq:short}
 \end{equation}
-Sub-millimeter tests bound $a$; non-detection tightens $a$ or constrains estimator locality.
+Here $a$ is the effective coarse-grain of the estimator (or physical cutoff). Sub-mm tests bound $a$; a null result tightens $a$ or constrains estimator locality.
 
 \paragraph*{(P2) Entanglement-assisted gravity.}
-Algorithmic mutual information increases joint compression; predicts a small enhancement $\delta_{\rm ent}$ in attraction for entangled masses (target $10^{-6}$–$10^{-4}$ at $\mu$m scales).
+Algorithmic mutual information increases joint compression; predicts a small enhancement $\delta_{\rm ent}$ in attraction for entangled masses. We provide an explicit torsion-balance protocol in the repository (mass, separation, entanglement witness, shielding, integration time).
 
 \paragraph*{(P3) No particle dark matter.}
 Rotation curves arise from description-curvature corrections (logarithmic tails) in galactic environments.
@@ -280,34 +297,39 @@ Low-$\Phi$-gradient systems show reversal excess $1+\xi$, with $\xi\sim 10^{-3}$
 % ========================= Appendices =========================
 \appendix
 
-\section{From Minimal Local Code Curvature to Poisson and $1/r$}\label{app:A}
-Consider $\Phi[\rho]=\int \tfrac12 \|\nabla\psi\|^2\,d^3x$ with constraint $-\nabla^2\psi=\rho$. Variation with a Lagrange multiplier $\lambda$ yields $\delta(\mathcal{E}+\int \lambda(-\nabla^2\psi-\rho))=0 \Rightarrow -\nabla^2\psi=\rho$ and $\nabla\cdot(\nabla\psi)=\rho$. Point sources $\rho=m\delta(x)$ have $\psi=mk(r)$, where harmonicity outside sources and isotropy fix $k(r)=1/r$ in $n=3$, giving an inverse-square field $F=-\nabla\psi\propto r^{-2}$.
+\section{Dirichlet Functional $\Rightarrow$ Poisson and $1/r$}\label{app:A}
+Consider the unconstrained functional with sources and fixed boundary $\psi|_{\partial\Omega}=\psi_0$:
+\begin{equation}
+\mathcal{E}[\psi]=\int_{\Omega} \frac{1}{2}\|\nabla\psi\|^2\,d^3x \;-\; \int_{\Omega}\rho\,\psi\,d^3x. \label{eq:A1}
+\end{equation}
+Variation gives $\delta\mathcal E=\int_\Omega (\nabla\psi\cdot\nabla\delta\psi - \rho\,\delta\psi)\,dx
+= -\int_\Omega (\nabla^2\psi + \rho)\delta\psi\,dx + \int_{\partial\Omega} (\partial_n\psi)\delta\psi\,dA$.
+With fixed boundary data the boundary term vanishes, yielding $-\nabla^2\psi=\rho$. In $n=3$, the Green’s function is $G(x)=1/(4\pi r)$, so $\psi=G\ast \rho$ and $F=-\nabla\psi\propto r^{-2}$.
 
 \section{Born Rule from Description Length}\label{app:B}
 Let $\psi=\sum_k \alpha_k \phi_k$ encode compressed futures. Assume (i) additivity of description costs, (ii) invariance under coarse-graining of outcomes, (iii) normalization. Selecting an outcome $\phi_k$ adds $\Delta\Phi_k$ bits; define $P(\phi_k)\propto 2^{-\Delta\Phi_k}$. The axioms force $\Delta\Phi_k=-\log|\alpha_k|^2$, hence $P(\phi_k)=|\alpha_k|^2$.
 
 \section{Implementation Details for Simulations}\label{app:C}
-Primary estimator: MST cost, Eq.~\eqref{eq:mst}, computed via Prim's algorithm~\cite{Prim1957}. Ablations: $k$-NN, Delaunay, Lempel–Ziv of voxelized positions (8–12 bits per axis). Updates: MH at $\beta{=}10$ and underdamped Langevin with $(m,\gamma)$ chosen to match typical step sizes. Repository (reproducibility, scripts, and the Bell test code): \url{https://github.com/Snassy-icp/law_of_minimal_description/tree/main/code/simulations}.
+Primary estimator: MST cost, Eq.~\eqref{eq:mst}, computed via Prim's algorithm~\cite{Prim1957}. Ablations: $k$-NN, Delaunay, Lempel–Ziv of voxelized positions (8–12 bits per axis). Updates: Metropolis–Hastings at $\beta{=}10$ and underdamped Langevin with $(m,\gamma)$ matched to typical MH step sizes. Repository (reproducibility, scripts, LZ ablations, Bell test): \url{https://github.com/Snassy-icp/law_of_minimal_description/tree/main/code/simulations}.
 
 \section{Responses to Common Objections}\label{app:D}
-\textbf{Uncomputability.} Addressed by admissible $\widehat\Phi$ and Prop.~\ref{prop:grad}. \textbf{Closed-system entropy.} Resolved by model/data split and supermartingale remark (Sec.~\ref{sec:closed}). \textbf{“You assumed Laplace.”} Replaced by Thomson/Dirichlet principle (App.~\ref{app:A}). \textbf{Quantum formalism.} Codes $\to$ Hilbert and $\hbar$ calibration (App.~\ref{app:Q}). \textbf{Dimensionality.} Heuristic argument (App.~\ref{app:E}).
+\textbf{Uncomputability.} Addressed via admissible $\widehat\Phi$; Theorem~\ref{thm:lattice} justifies dynamics on lattices; Conjecture~\ref{conj:general} states the general case. \textbf{Closed-system entropy.} Resolved at the observer level (Sec.~\ref{sec:closed}). \textbf{“You assumed Laplace.”} Replaced by the unconstrained Dirichlet functional (App.~\ref{app:A}). \textbf{Quantum formalism.} Codes $\to$ Hilbert and $\hbar$ are presented as a construction (App.~\ref{app:Q}). \textbf{Dimensionality.} Heuristic argument (App.~\ref{app:E}).
 
 \section{Why 3 Dimensions? A Heuristic}\label{app:E}
 $n{=}3$ uniquely supports (i) local, isotropic, scale-free kernels with conserved flux; (ii) harmonic Green's functions with finite-energy bound structures; (iii) additive compression flux under partition. In $n{<}3$ global structures are unstable or trivial; for $n{\ge}4$ scale-free kernels trade off stability vs.\ finite local flux. Hence $k(r)=1/r$ in $3$D maximizes compression consistency.
 
 \section{Gradient Consistency: Measure and Refinement}\label{app:grad}
-We endow the finite-precision configuration space with the product topology and the counting/Lebesgue hybrid measure $\mu$. Admissible $\widehat\Phi_{a,b}$ are local, Lipschitz, and prefix-free MDL; Γ-convergence as $(a,b)\to (0,\infty)$ holds under refinement stability. Discontinuity sets of $K$ are $\mu$-null in this topology. Hence directional derivatives of $\Phi$ and $\widehat\Phi$ agree $\mu$-a.e.\ in full-measure cones.
+Finite-precision spaces $\mathcal X_{a,b}$ carry the product topology and the cylinder $\sigma$-algebra with counting measure; continuum fields use Lebesgue measure. Admissible $\widehat\Phi_{a,b}$ are local, Lipschitz, and prefix-free MDL; $\Gamma$-convergence as $(a,b)\to (0,\infty)$ holds under refinement stability \cite{Braides2002}. Discontinuity sets of $K$ are cylinder-null. Hence Theorem~\ref{thm:lattice} holds; the general statement is Conjecture~\ref{conj:general}.
 
-\section{Codes $\to$ Hilbert; $\hbar$ Calibration; CCR Sketch}\label{app:Q}
-\textbf{Codes $\to$ Hilbert.} Let prefix-free codewords form coordinates with Kraft normalization. Inner product $\langle \psi,\phi\rangle=\sum_i c_i^* d_i$ defines $\mathcal{H}$. Code-preserving linear maps are isometries, hence unitary up to phase.
+\section{Codes $\to$ Hilbert; $\hbar$ (Proposed Identification); CCR Sketch}\label{app:Q}
+\textbf{Codes $\to$ Hilbert (construction).} Let prefix-free codewords form coordinates with Kraft normalization. Inner product $\langle \psi,\phi\rangle=\sum_i c_i^* d_i$ defines $\mathcal{H}$. Code-preserving linear maps are isometries, hence unitary up to phase.
 
-\textbf{$\hbar$ calibration.} In Euclidean signature, weight $e^{-S_E/\hbar}$; assign $2^{-\kappa \Phi}$ to description weight. Identify $\kappa=\hbar/\ln 2$ so path weights and description weights coincide after Wick rotation.
+\textbf{$\hbar$ (proposed identification).} In Euclidean signature, weight $e^{-S_E/\hbar}$; assign $2^{-\kappa \Phi}$ to description weight. Identify $\kappa=\hbar/\ln 2$ so path weights and description weights coincide after Wick rotation.
 
-\textbf{CCR sketch.} The local quadratic code length induces a Fisher metric; maximizing likelihood subject to variance yields Robertson-type inequalities $\Delta A\,\Delta B\ge \tfrac{1}{2}|\langle[A,B]\rangle|$ with the $\hbar$ scale fixed by the above calibration.
+\textbf{CCR sketch.} The local quadratic code length induces a Fisher metric; maximizing likelihood subject to variance yields Robertson-type inequalities $\Delta A\,\Delta B\ge \tfrac{1}{2}|\langle[A,B]\rangle|$ with the $\hbar$ scale fixed by the above identification.
 
 \section{Bell/CHSH as a Non-Tautological MDL Witness}\label{app:BELL}
-For settings $(X,Y)\in\{0,1\}^2$, define the score bit $s:=A\oplus B\oplus (X\!\cdot\!Y)$. Let $\omega=\Pr[s=0]$. For $N$ trials, \emph{ideal} savings vs.\ fair coin equal $N[1-h_2(\omega)]$. To avoid tautology, we report (i) train/test MDL (fit $p$ on half, code the other half), (ii) KT universal codelength (prequential, no fitting), and (iii) fixed-parameter MDL under LHV/Q/PR priors. Results (typical $N\!=\!2\cdot 10^5$):
-LHV $\omega{\approx}0.75$ (train/test $\approx 0.5\cdot 0.189 N$), Quantum $\omega{\approx}\cos^2\!\frac{\pi}{8}$ ($\approx 0.5\cdot 0.399 N$), PR $\omega{=}1$ ($0.5N$). Individual $A,B$ streams remain incompressible ($\approx 0$ savings), confirming no signalling. Code in repository.
+For settings $(X,Y)\in\{0,1\}^2$, define the score bit $s:=A\oplus B\oplus (X\!\cdot\!Y)$. Let $\omega=\Pr[s=0]$. For $N$ trials, \emph{ideal} savings vs.\ fair coin equal $N[1-h_2(\omega)]$. To avoid tautology, we report (i) train/test MDL (fit $p$ on half, code the other half), (ii) KT universal codelength (prequential, no fitting), and (iii) fixed-parameter MDL under LHV/Q/PR priors. Individual $A,B$ streams remain incompressible (no-signalling). Code in repository.
 
 % ========================= References =========================
 \section*{References}
