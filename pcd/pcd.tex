@@ -27,6 +27,9 @@
 }
 
 \numberwithin{equation}{section}
+% Theorem environments
+\newtheorem{proposition}{Proposition}[section]
+\newtheorem{lemma}{Lemma}[section]
 
 % Macros
 \newcommand{\R}{\mathbb{R}}
@@ -55,7 +58,7 @@ We present \emph{Predictive Compression Dynamics} (PCD), a methodological recipe
 A disciplined workflow to construct and test \emph{computable} local functionals $\widehat{\Phi}$ whose gradients define dynamics, with explicit preregistration (domain, discretization, kernels, parameters) and sanity checks.
 
 \section{Operational Domain and Notation}
-We consider $N$ point agents with positions $x_i\in\R^3$ and positive weights $m_i$. Computations use finite precision: lattice spacing $a_{\text{grid}}$ and $b$ bits/axis, stated \emph{a priori}. A global calibration constant $G_{\text{eff}}>0$ maps dimensionless forces to physical units. \emph{Design choice:} we use the same $m_i$ in the interaction and as inertial mass; this incidentally yields accelerations independent of $m_i$ by construction.
+We consider $N$ point \emph{particles} with positions $x_i\in\R^3$ and positive weights $m_i$. Computations use finite precision: lattice spacing $a_{\text{grid}}$ and $b$ bits/axis, stated \emph{a priori}. A global calibration constant $G_{\text{eff}}>0$ maps dimensionless forces to physical units. \emph{Design choice:} we use the same $m_i$ in the interaction and as inertial mass; this incidentally yields accelerations independent of $m_i$ by construction.
 
 \section{Model--Data Decomposition and Coding Link}
 Following MDL, we split description length as
@@ -78,6 +81,17 @@ Then, for fixed binning overhead and under mild regularity,
 L_{\text{tot}} \approx \text{const} + \sum_{(i,j)} \ell(r_{ij}).
 \end{equation}
 Choosing $\widehat{\Phi}\propto -\sum_{(i,j)} \ell(r_{ij})$ makes $-\nabla\widehat{\Phi}$ a proxy for the gradient of achievable compression. A smooth choice $\ell(r)\approx (r^2+a^2)^{-1/2}$ yields closed-form forces below.
+
+\begin{proposition}[Surrogate MDL Descent]
+\label{prop:mdl-descent}
+Suppose $L_{\text{tot}}=\mathrm{const}+\sum_{(i,j)}\ell(r_{ij})$ with $\ell'(r)\le 0$ and 
+$\widehat{\Phi}=-\kappa\sum_{(i,j)}\ell(r_{ij})$ for some $\kappa>0$. 
+Then along $\dot x=-\nabla\widehat{\Phi}(x)$ we have $\frac{d}{dt}L_{\text{tot}}(x(t))\le 0$,
+with equality iff $\nabla\widehat{\Phi}(x(t))=0$.
+\end{proposition}
+
+\noindent\emph{Sketch.} $\frac{d}{dt}L_{\text{tot}}=\langle\nabla L_{\text{tot}},\dot x\rangle
+= -\kappa^{-1}\langle\nabla\widehat{\Phi},\nabla\widehat{\Phi}\rangle \le 0.$
 
 \section{Information-Motivated Functionals}
 \subsection{Fixed-graph functional (corrected notation)}
@@ -114,6 +128,14 @@ With $\dot x=-\nabla\widehat{\Phi}(x)$,
 \frac{d}{dt}\widehat{\Phi}(x(t)) = -\lVert\nabla\widehat{\Phi}(x(t))\rVert^2 \le 0,
 \end{equation}
 so $\widehat{\Phi}$ is a Lyapunov function. We preregister all parameters $(a_{\text{grid}},b,a,\sigma,\Delta t,m_i,\gamma,T,\text{seeds})$.
+
+\begin{lemma}[Compression-Rate Identity]
+\label{lem:compression-rate}
+Under $\dot x=-\nabla\widehat{\Phi}(x)$ the quantity 
+$\dot C_{\mathrm{alg}}(t):=-\frac{d}{dt}\widehat{\Phi}(x(t))$ equals 
+$\|\nabla\widehat{\Phi}(x(t))\|^2\ge 0$. Hence $\widehat{\Phi}$ is a Lyapunov function and
+$\dot C_{\mathrm{alg}}$ is the instantaneous achievable compression rate.
+\end{lemma}
 
 \paragraph{Deterministic gradient flow.}
 Explicit Euler:
