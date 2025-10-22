@@ -48,170 +48,156 @@ A Methodological Framework for Computable Information-Driven Modeling}
 
 \begin{abstract}
 \noindent
-We present \emph{Predictive Compression Dynamics} (PCD) as a \emph{methodological framework} for building \emph{computable} local functionals that drive dynamics by explicit gradient flow. Rather than postulating uncomputable principles, PCD starts from an \emph{information-motivated} surrogate codelength $\widehat{\Phi}$ and specifies dynamics $\dot{x}\propto -\nabla\widehat{\Phi}(x)$ with all parameters preregistered. We study two concrete classes: (i) a \emph{fixed-graph} functional
-\[
-\widehat{\Phi}_E(x)= -\!\!\sum_{(i,j)\in E}\frac{m_im_j}{\sqrt{\lVert x_i-x_j\rVert^2+a^2}},
-\]
-and (ii) a \emph{smooth kernel} functional
-\[
-\widehat{\Phi}_K(x)= -\sum_{i<j} m_im_j\,K_\sigma(\lVert x_i-x_j\rVert),
-\]
-with $K_\sigma$ compactly supported and $C^1$. The first provides a transparent sandbox; the second avoids neighbor-set discontinuities and guarantees well-posedness. In the dilute two-body limit both produce an attractive $1/r^2$ \emph{form} (after calibration), while the softening $a$ regularizes collisions. These are \emph{operational, information-motivated models}, not new claims about gravity; familiar “Plummer-like” roll-offs serve here as \emph{sanity checks}, not phenomenological predictions. We give preregistered algorithms, an explicit model--data codelength decomposition, and clear falsification criteria for model instances. The framework supports reproducible exploration of \emph{computable} compression-driven dynamics across domains.
+We present \emph{Predictive Compression Dynamics} (PCD), a methodological recipe for constructing \emph{computable}, local functionals $\widehat{\Phi}$ and driving dynamics by gradient flow $\dot x=-\nabla\widehat{\Phi}(x)$ with preregistered parameters. Two concrete instances are given: (i) a fixed-graph pair functional and (ii) a smooth compact-support kernel; both yield an attractive inverse-square two-body form (after calibration) and admit Lyapunov descent. We emphasize that these models serve as methodological demonstrations of computable, information-motivated dynamics, without asserting new physical law. We make the MDL split $L_{\text{tot}}=L(M)+L(D\mid M)$ explicit, give a minimal coding scheme linking $-\widehat{\Phi}$ descent to achievable $\Delta L_{\text{tot}}$, address well-posedness (smooth-kernel variant), recommend robust integrators (BAOAB for Langevin), and provide a preregistration/model-card template and falsifiers for a chosen model instance. The goal is a reproducible toolbox for compression-driven dynamics across domains.
 \end{abstract}
 
 \section{Positioning and Commitments}
-\textbf{What this paper is:} a disciplined way to construct and test \emph{computable} local functionals $\widehat{\Phi}$ whose gradients define dynamics. We make code-level, preregistered choices explicit (domains, discretizations, kernels, parameters) and provide sanity checks.
+\textbf{What this paper is.}  
+A disciplined workflow to construct and test \emph{computable} local functionals $\widehat{\Phi}$ whose gradients define dynamics, with explicit preregistration (domain, discretization, kernels, parameters) and sanity checks.
 
 \medskip
-\noindent\textbf{What this paper is \emph{not}}: a claim of novel gravitational phenomenology, nor a derivation of GR/QM. Any resemblance of simple pair terms to familiar softened potentials is acknowledged and used only as a controlled testbed.
+\noindent\textbf{What this paper is not.}  
+It does not propose new physical laws; any similarity of pair terms to known potentials is used solely for controlled validation.
 
 \section{Operational Domain and Notation}
-We consider $N$ point agents with positions $x_i\in\R^3$ and positive weights $m_i$ (``masses''). Computations occur at finite precision: lattice spacing $a_{\text{grid}}$ and $b$ bits per coordinate stated \emph{a priori}. A global calibration constant $G_{\text{eff}}>0$ turns the dimensionless force into physical units.
+We consider $N$ point agents with positions $x_i\in\R^3$ and positive weights $m_i$. Computations use finite precision: lattice spacing $a_{\text{grid}}$ and $b$ bits/axis, stated \emph{a priori}. A global calibration constant $G_{\text{eff}}>0$ maps dimensionless forces to physical units. \emph{Design choice:} we use the same $m_i$ in the interaction and as inertial mass; this incidentally yields accelerations independent of $m_i$ by construction.
 
-\section{Information-Motivated Functionals}
-
-\paragraph{Model--data decomposition (explicit).}
-Following standard MDL reasoning, a description length splits as
+\section{Model--Data Decomposition and Coding Link}
+Following MDL, we split description length as
 \begin{equation}
 \label{eq:Ltot}
 L_{\text{tot}} = L(M) + L(D\mid M),
 \end{equation}
-where $L(M)$ encodes the model/regularities and $L(D\mid M)$ the residual data given that model. A decrease $\Delta L_{\text{tot}}<0$ corresponds to \emph{realized compression}. In PCD we treat a computable, local $\widehat{\Phi}$ as a proxy for the \emph{negative} of an achievable $\Delta L_{\text{tot}}$; gradient descent in $\widehat{\Phi}$ heuristically implements compression.
+where $L(M)$ encodes modeled regularities and $L(D\mid M)$ encodes residuals given $M$. A decrease $\Delta L_{\text{tot}}<0$ corresponds to realized compression. PCD treats a computable, local $\widehat{\Phi}$ as a proxy for (the negative of) an achievable $\Delta L_{\text{tot}}$; thus $\dot x=-\nabla\widehat{\Phi}$ implements a descent in achievable codelength under the chosen surrogate.
 
-\subsection{Fixed-graph functional}
-Let $E\subset\{(i,j):\,1\le i<j\le N\}$ be a symmetric, degree-bounded edge set (e.g.\ an initial $k$NN graph). Define
+\paragraph{Minimal explicit coding scheme.}
+Let $(i,j)$ range over a symmetric set of ``near'' pairs. A two-part code describes (i) a shared pairwise template per distance bin and (ii) residual offsets:
+\begin{itemize}
+\item Partition distances into bins $\{B_k\}$ with centers $r_k$; encode the histogram counts with a prefix-free code.
+\item For each pair $(i,j)$ with $r_{ij}\in B_k$, encode a residual offset relative to a shared template; the expected residual codelength per pair is a decreasing function $\ell(r_{ij})$.
+\end{itemize}
+Then, for fixed binning overhead and under mild regularity,
+\begin{equation}
+\label{eq:Ltotsum}
+L_{\text{tot}} \approx \text{const} + \sum_{(i,j)} \ell(r_{ij}).
+\end{equation}
+Choosing $\widehat{\Phi}\propto -\sum_{(i,j)} \ell(r_{ij})$ makes $-\nabla\widehat{\Phi}$ a proxy for the gradient of achievable compression. A smooth choice $\ell(r)\approx (r^2+a^2)^{-1/2}$ yields closed-form forces below.
+
+\section{Information-Motivated Functionals}
+\subsection{Fixed-graph functional (corrected notation)}
+Let $E\subset\{(i,j):\,1\le i<j\le N\}$ be a symmetric, degree-bounded edge set. Define
 \begin{equation}
 \label{eq:phiE}
-\widehat{\Phi}_E(x)= -\sum_{(i,j)\in E} \frac{m_im_j}{\sqrt{\lVert x_i-x_j\rVert^2+a^2}},
-\qquad a>0.
+\widehat{\Phi}_E(x)= -\sum_{(i,j)\in E} \frac{m_im_j}{\sqrt{\lVert x_i-x_j\rVert^2+a^2}},\qquad a>0.
 \end{equation}
-\emph{Sign convention:} the minus sign ensures attraction under gradient descent. Softening $a$ regularizes collisions. The force on $i$ is
+The minus sign ensures attraction under descent; $a$ regularizes collisions. The force on $i$ is
 \begin{align}
 \label{eq:forceE}
-F^{(E)}_i(x) 
-&= -\nabla_{x_i}\widehat{\Phi}_E(x) \nonumber\\
-&= -\sum_{\substack{j:\\(i,j)\in E}} 
+F^{(E)}_i(x)
+&= -\nabla_{x_i}\widehat{\Phi}_E(x)
+= -\sum_{\substack{j:\\(i,j)\in E}}
 m_im_j\,\frac{(x_i-x_j)}{\big(\lVert x_i-x_j\rVert^2+a^2\big)^{3/2}}.
 \end{align}
-In the two-body, $a\to0$ limit with $(i,j)\in E$,
+Two-body, $a\to 0$, $(i,j)\in E$ gives the attractive inverse-square form:
 \begin{equation}
 \label{eq:twoBody}
-F^{(E)}_i \to -\,m_im_j\,\frac{x_i-x_j}{\lVert x_i-x_j\rVert^3},
+F^{(E)}_i \to -\,m_im_j\,\frac{x_i-x_j}{\lVert x_i-x_j\rVert^3}.
 \end{equation}
-i.e.\ an attractive $1/r^2$ \emph{form} along the active edge. For physical units we use $F^{\text{phys}}_i=G_{\text{eff}}\,F^{(E)}_i$.
-\paragraph{Remark (edge modeling).} Forces vanish between pairs not in $E$; this is a \emph{modeling choice} for locality/sparsity, not a universal law.
 
-\subsection{Smooth-kernel functional}
-To avoid kNN neighbor-set discontinuities, choose a compactly supported, $C^1$ radial kernel $K_\sigma:[0,\infty)\to\R_{\ge 0}$ with support $[0,R\sigma]$ (e.g.\ a Wendland $C^2$ kernel). Define
+\subsection{Smooth-kernel functional (well-posedness)}
+To avoid neighbor-set discontinuities, choose a compactly supported, $C^1$ radial kernel $K_\sigma:[0,\infty)\to\R_{\ge 0}$ with support $\subset[0,R\sigma]$. Define
 \begin{equation}
 \label{eq:phiK}
-\widehat{\Phi}_K(x)= -\sum_{i<j} m_im_j\,K_\sigma\!\big(\lVert x_i-x_j\rVert\big).
+\widehat{\Phi}_K(x)= -\sum_{i<j} m_im_j\,K_\sigma\!\big(\lVert x_i-x_j\rVert\big),
 \end{equation}
-Then $F^{(K)}_i(x)=-\nabla_{x_i}\widehat{\Phi}_K(x)$ is continuous and locally Lipschitz (away from collisions if $K_\sigma'(0)$ finite). For $K_\sigma(r)\sim (r^2+a^2)^{-1/2}$ near zero one recovers the same regularized two-body \emph{form} as \eqref{eq:twoBody}.
+so $F^{(K)}_i(x)=-\nabla_{x_i}\widehat{\Phi}_K(x)$ is continuous and locally Lipschitz off collisions. If $K_\sigma(r)\sim (r^2+a^2)^{-1/2}$ near $r=0$, one recovers the regularized two-body form \eqref{eq:twoBody}.
 
-\subsection{A minimal codelength view}
-Interpreting $-\widehat{\Phi}$ as a surrogate \emph{gain in description length} when nearby pairs are represented jointly, if the expected residual codelength per pair scales like a decreasing $\ell(r_{ij})$, then
-\[
-L_{\text{tot}} \approx \text{const} + \sum_{(i,j)} \ell(r_{ij}),
-\quad\Rightarrow\quad
-\widehat{\Phi}\;\propto\; -\sum_{(i,j)} \ell(r_{ij}).
-\]
-We refrain from claiming exact MDL optimality; $\widehat{\Phi}$ is an \emph{operational proxy} to be tested.
-
-\section{Dynamics and Preregistration}
-All parameters $(a_{\text{grid}},b,a,\sigma, \Delta t, m_i,\gamma,T,\text{seeds})$ are fixed \emph{before} experiments.
+\section{Dynamics and Integrators}
+With $\dot x=-\nabla\widehat{\Phi}(x)$,
+\begin{equation}
+\frac{d}{dt}\widehat{\Phi}(x(t)) = -\lVert\nabla\widehat{\Phi}(x(t))\rVert^2 \le 0,
+\end{equation}
+so $\widehat{\Phi}$ is a Lyapunov function. We preregister all parameters $(a_{\text{grid}},b,a,\sigma,\Delta t,m_i,\gamma,T,\text{seeds})$.
 
 \paragraph{Deterministic gradient flow.}
+Explicit Euler:
 \begin{equation}
-x_i^{(t+\Delta t)}=x_i^{(t)}+\Delta t\,F_i(x^{(t)}),\quad 
-F_i\in\{F^{(E)}_i,F^{(K)}_i\}.
+x_i^{(t+\Delta t)} = x_i^{(t)} + \Delta t\,F_i(x^{(t)}),\quad F_i\in\{F^{(E)}_i,F^{(K)}_i\}.
 \end{equation}
+For stability, use adaptive $\Delta t$ or semi-implicit variants.
 
-\paragraph{Underdamped Langevin.}
+\paragraph{Underdamped Langevin (BAOAB recommended).}
 \begin{equation}
 m_i\ddot{x}_i = F_i(x)-\gamma\,\dot{x}_i + \xi_i(t),\quad
 \langle \xi_i(t)\xi_j(t')\rangle=2\gamma k_B T\,\delta_{ij}\delta(t-t').
 \end{equation}
+We recommend the BAOAB integrator with reported weak/strong orders.
 
-\section{Sanity Checks (not phenomenology)}
-\textbf{Two-body limit.} With $a\to 0$ and a single interacting pair, \eqref{eq:twoBody} holds (after calibration $G_{\text{eff}}$).\\
-\textbf{Softening expansion (corrected).} For $r=\lVert x_i-x_j\rVert\gg a$,
+\section{Sanity Checks}
+With $a\to 0$ and a single pair, \eqref{eq:twoBody} holds (after one calibration $G_{\text{eff}}$).  
+For $r\gg a$,
 \begin{align}
-\label{eq:softSeries}
 \frac{r}{(r^2+a^2)^{3/2}}
 = \frac{1}{r^2}\left(1-\frac{3a^2}{2r^2}+O\!\left(\frac{a^4}{r^4}\right)\right),
 \end{align}
-hence
+so
 \begin{equation}
-\label{eq:forceCorrect}
 \big\lVert F^{(E)}_i\big\rVert
 = m_im_j\,\frac{r}{(r^2+a^2)^{3/2}}
-\;\stackrel{r\gg a}{=}\; m_im_j\,\frac{1}{r^2}\Big(1-\frac{3a^2}{2r^2}+\dots\Big).
+\approx m_im_j\,\frac{1}{r^2}\left(1-\frac{3a^2}{2r^2}\right).
 \end{equation}
-We use \eqref{eq:softSeries} solely to verify numerics; \emph{no claim} is made that nature exhibits such a roll-off at any laboratory scale.
+These expansions serve purely as numerical consistency checks.
 
 \section{Well-posedness}
-For $a>0$ and bounded degree, $\widehat{\Phi}_E\in C^1(\R^{3N}\setminus\{x_i=x_j\})$ and $F^{(E)}$ is locally Lipschitz away from collisions; similarly $F^{(K)}$ is continuous and locally Lipschitz for $C^1$ kernels with bounded derivative at $0$. If $k$NN is used with dynamic neighbors, forces are only piecewise smooth; then employ (i) hysteresis for neighbor swaps, (ii) temporal smoothing of weights, or (iii) prefer the smooth kernel model \eqref{eq:phiK}.
+For $a>0$ and bounded degree, $\widehat{\Phi}_E\in C^1(\R^{3N}\setminus\{x_i=x_j\})$ and $F^{(E)}$ is locally Lipschitz off collisions. For $C^1$ kernels with bounded $K'_\sigma$, $F^{(K)}$ is continuous and locally Lipschitz. Existence and uniqueness follow by Picard–Lindelöf on compact intervals. For dynamic $k$NN, forces are piecewise smooth; employ hysteresis or prefer the smooth kernel.
 
-\section{A Preregistered Model Card (example)}
+\section{Preregistered Model Card (example)}
 \textbf{Domain.} $a_{\text{grid}}=\SI{10}{\micro m}$, $b=16$. \\
-\textbf{Functional.} $\widehat{\Phi}_K$ with Wendland $C^2$ kernel of scale $\sigma=\SI{0.5}{mm}$; softening $a=\SI{50}{\micro m}$. \\
-\textbf{Dynamics.} Underdamped with $(m_i\equiv 1,\gamma=0.1,T=\SI{300}{K})$, $\Delta t=\SI{1e-3}{s}$. \\
-\textbf{Calibration.} $G_{\text{eff}}$ fit once in a dilute two-body sandbox at $r\gg a$. \\
-\textbf{Sanity checks.} Verify \eqref{eq:twoBody} form and \eqref{eq:softSeries} numerically; report seeds and residuals.
+\textbf{Functional.} $\widehat{\Phi}_K$ with Wendland $C^2$ kernel ($\sigma=\SI{0.5}{mm}$); softening $a=\SI{50}{\micro m}$. \\
+\textbf{Dynamics.} BAOAB underdamped with $(m_i\equiv 1,\gamma=0.1,T=\SI{300}{K})$, $\Delta t=\SI{1e-3}{s}$. \\
+\textbf{Calibration.} Single $G_{\text{eff}}$ fit in a dilute two-body sandbox at $r\gg a$. \\
+\textbf{Sanity checks.} Verify \eqref{eq:twoBody} and the far-field expansion; report seeds and residuals.
 
-\section{What to Falsify (for a given instance)}
-Given fixed $(\widehat{\Phi},\text{params})$, the instance is falsified if:
+\section{Falsifiers for a chosen instance}
+Given fixed $(\widehat{\Phi},\text{params})$, declare the instance falsified if:
 \begin{enumerate}[label=(F\arabic*)]
-\item Two-body trajectories disagree with the calibrated $1/r^2$ \emph{form} beyond stated error under identical numerical conditions.
-\item Kernel vs.\ fixed-graph variants yield statistically inconsistent small-$r$ behavior not explainable by topology (violates within-class robustness).
-\item The chosen code-length proxy (e.g.\ $-\widehat{\Phi}$ vs.\ an external structural complexity metric) fails to correlate in controlled tests.
+\item Two-body trajectories disagree with the calibrated inverse-square form beyond numerical error.
+\item Smooth-kernel vs fixed-graph variants differ systematically at small $r$ beyond topology effects.
+\item The code-length proxy correlates poorly with realized compression in controlled tests (e.g.\ $-\widehat{\Phi}$ vs measured $L_{\text{tot}}$).
 \end{enumerate}
-These are \emph{model-level} falsifiers; they do not purport to test fundamental physics.
 
 \section{Discussion and Scope}
-PCD supplies a reproducible route from \emph{computable} information-motivated functionals to concrete dynamics. Simple pairwise terms coincide with well-known softened interactions; this is a feature for validation, not a novelty claim. The framework can be extended to richer $\widehat{\Phi}$ (e.g.\ graph Laplacians, learned local codes) with the same preregistration discipline.
+PCD supplies a reproducible route from \emph{computable} information-motivated functionals to concrete dynamics. That simple pairwise surrogates coincide with familiar inverse-square interactions is a feature for validation, not a claim of novelty. Future work will broaden $\widehat{\Phi}$ (e.g.\ learned local codes, graph Laplacians) under the same preregistration discipline.
 
 \section*{Acknowledgments}
-We thank colleagues for discussions on local estimators, kernels, and $N$-body numerics. Any prior drafts suggesting phenomenology are superseded by this methodological formulation.
+We thank colleagues for discussions on local estimators, kernels, integrators, and $N$-body numerics. Earlier drafts that explored alternative framings are superseded by this methodological formulation.
 
 \section*{References}
-\begin{thebibliography}{9}
+\begin{thebibliography}{12}
 \bibitem{Shannon1948}
-C.~E.~Shannon, ``A mathematical theory of communication,'' \emph{Bell Syst.\ Tech.\ J.} (1948).
+C.\ E.\ Shannon, ``A mathematical theory of communication,'' \emph{Bell Syst.\ Tech.\ J.} (1948).
 \bibitem{Rissanen1978}
-J.~Rissanen, ``Modeling by shortest data description,'' \emph{Automatica} (1978).
+J.\ Rissanen, ``Modeling by shortest data description,'' \emph{Automatica} (1978).
+\bibitem{Levin}
+L.\ A.\ Levin, ``On the notion of a random sequence,'' \emph{Sov.\ Math.\ Dokl.} (1971).
+\bibitem{Amari2016}
+S.\ Amari, \emph{Information Geometry and Its Applications}, Springer (2016).
+\bibitem{JordanKinderlehrerOtto1998}
+R.\ Jordan, D.\ Kinderlehrer, F.\ Otto, ``The variational formulation of the Fokker–Planck equation,'' \emph{SIAM J.\ Math.\ Anal.} \textbf{29} (1998).
+\bibitem{Caticha2012}
+A.\ Caticha, \emph{Entropic Inference and the Foundations of Physics}, (2012).
+\bibitem{Wendland1995}
+H.\ Wendland, ``Piecewise polynomial, positive definite and compactly supported radial functions,'' \emph{Adv.\ Comput.\ Math.} \textbf{4} (1995) 389--396.
+\bibitem{LeimkuhlerMatthews2013}
+B.\ Leimkuhler, M.\ Matthews, ``Rational construction of stochastic numerical methods for molecular sampling,'' \emph{Appl.\ Math.\ Res.\ eXpress} (2013).
+\bibitem{LeimkuhlerMatthews2016}
+B.\ Leimkuhler, C.\ Matthews, \emph{Molecular Dynamics}, Springer (2016).
+\bibitem{Prim1957}
+R.\ C.\ Prim, ``Shortest connection networks and some generalizations,'' \emph{Bell Syst.\ Tech.\ J.} \textbf{36}, 1389--1401 (1957).
+\bibitem{Hernquist1990}
+L.\ Hernquist, ``An analytical model for spherical galaxies and bulges,'' \emph{ApJ} \textbf{356}, 359--364 (1990).
 \bibitem{Plummer1911}
-H.~C.~Plummer, ``On the problem of distribution in globular star clusters,'' \emph{MNRAS} \textbf{71}, 460--470 (1911).
-\bibitem{Wendland}
-H.~Wendland, ``Piecewise polynomial, positive definite and compactly supported radial functions,'' \emph{Adv.\ Comput.\ Math.} \textbf{4} (1995) 389--396.
+H.\ C.\ Plummer, ``On the problem of distribution in globular star clusters,'' \emph{MNRAS} \textbf{71}, 460--470 (1911).
 \end{thebibliography}
 
-\appendix
-
-\section{Schematic Field (single edge)}
-\begin{figure}[h]
-\centering
-\begin{tikzpicture}[>=stealth]
-  % Particles
-  \fill (-2,0) circle (2pt) node[below] {$i$};
-  \fill ( 2,0) circle (2pt) node[below] {$j$};
-  % Left-side arrows pointing right
-  \draw[->] (-3.2, 0.8) -- (-2.6, 0.8);
-  \draw[->] (-3.2, 0.4) -- (-2.7, 0.4);
-  \draw[->] (-3.2, 0.0) -- (-2.8, 0.0);
-  \draw[->] (-3.2,-0.4) -- (-2.7,-0.4);
-  \draw[->] (-3.2,-0.8) -- (-2.6,-0.8);
-  % Right-side arrows pointing left
-  \draw[->] ( 3.2, 0.8) -- ( 2.6, 0.8);
-  \draw[->] ( 3.2, 0.4) -- ( 2.7, 0.4);
-  \draw[->] ( 3.2, 0.0) -- ( 2.8, 0.0);
-  \draw[->] ( 3.2,-0.4) -- ( 2.7,-0.4);
-  \draw[->] ( 3.2,-0.8) -- ( 2.6,-0.8);
-\end{tikzpicture}
-\caption{Attractive field along the active edge for \eqref{eq:phiE}; magnitude regularized near particles by $a$.}
-\end{figure}
-
-\section{Units and the corrected far-field}
-With $x$ in length units, \eqref{eq:phiE} has units of inverse length. The calibrated constant $G_{\text{eff}}$ supplies force units so that $F^{\text{phys}}=G_{\text{eff}}F$. The large-$r$ expansion used for numerical validation is \eqref{eq:softSeries} and \eqref{eq:forceCorrect}.
 \end{document}
