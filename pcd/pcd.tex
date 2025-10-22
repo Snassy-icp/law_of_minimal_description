@@ -36,7 +36,7 @@
 \newcommand{\argmax}{\operatorname*{arg\,max}}
 
 \title{\bf Predictive Compression Dynamics:\\
-A Methodological Framework for Computable Information-Driven Modeling}
+A Methodological Framework for Computable Information-Motivated Modeling}
 
 \author[1]{Mats Helander}
 \author[1]{Jeeves}
@@ -48,16 +48,11 @@ A Methodological Framework for Computable Information-Driven Modeling}
 
 \begin{abstract}
 \noindent
-We present \emph{Predictive Compression Dynamics} (PCD), a methodological recipe for constructing \emph{computable}, local functionals $\widehat{\Phi}$ and driving dynamics by gradient flow $\dot x=-\nabla\widehat{\Phi}(x)$ with preregistered parameters. Two concrete instances are given: (i) a fixed-graph pair functional and (ii) a smooth compact-support kernel; both yield an attractive inverse-square two-body form (after calibration) and admit Lyapunov descent. We emphasize that these models serve as methodological demonstrations of computable, information-motivated dynamics, without asserting new physical law. We make the MDL split $L_{\text{tot}}=L(M)+L(D\mid M)$ explicit, give a minimal coding scheme linking $-\widehat{\Phi}$ descent to achievable $\Delta L_{\text{tot}}$, address well-posedness (smooth-kernel variant), recommend robust integrators (BAOAB for Langevin), and provide a preregistration/model-card template and falsifiers for a chosen model instance. The goal is a reproducible toolbox for compression-driven dynamics across domains.
+We present \emph{Predictive Compression Dynamics} (PCD), a methodological recipe for constructing \emph{computable}, local functionals $\widehat{\Phi}$ and driving dynamics by gradient flow $\dot x=-\nabla\widehat{\Phi}(x)$ with preregistered parameters. Two concrete instances are given: (i) a fixed-graph pair functional and (ii) a smooth compact-support kernel; both yield an attractive inverse-square two-body form (after calibration) and admit Lyapunov descent. These models serve as methodological demonstrations of computable, information-motivated dynamics. We make the MDL split $L_{\text{tot}}=L(M)+L(D\mid M)$ explicit, give a minimal coding scheme linking $-\widehat{\Phi}$ descent to achievable $\Delta L_{\text{tot}}$, address well-posedness (smooth-kernel variant), recommend robust integrators (BAOAB for Langevin), and provide a preregistration/model-card template and falsifiers for a chosen model instance. The goal is a reproducible toolbox for compression-driven dynamics across domains.
 \end{abstract}
 
 \section{Positioning and Commitments}
-\textbf{What this paper is.}  
 A disciplined workflow to construct and test \emph{computable} local functionals $\widehat{\Phi}$ whose gradients define dynamics, with explicit preregistration (domain, discretization, kernels, parameters) and sanity checks.
-
-\medskip
-\noindent\textbf{What this paper is not.}  
-It does not propose new physical laws; any similarity of pair terms to known potentials is used solely for controlled validation.
 
 \section{Operational Domain and Notation}
 We consider $N$ point agents with positions $x_i\in\R^3$ and positive weights $m_i$. Computations use finite precision: lattice spacing $a_{\text{grid}}$ and $b$ bits/axis, stated \emph{a priori}. A global calibration constant $G_{\text{eff}}>0$ maps dimensionless forces to physical units. \emph{Design choice:} we use the same $m_i$ in the interaction and as inertial mass; this incidentally yields accelerations independent of $m_i$ by construction.
@@ -68,7 +63,8 @@ Following MDL, we split description length as
 \label{eq:Ltot}
 L_{\text{tot}} = L(M) + L(D\mid M),
 \end{equation}
-where $L(M)$ encodes modeled regularities and $L(D\mid M)$ encodes residuals given $M$. A decrease $\Delta L_{\text{tot}}<0$ corresponds to realized compression. PCD treats a computable, local $\widehat{\Phi}$ as a proxy for (the negative of) an achievable $\Delta L_{\text{tot}}$; thus $\dot x=-\nabla\widehat{\Phi}$ implements a descent in achievable codelength under the chosen surrogate.
+where $L(M)$ encodes modeled regularities and $L(D\mid M)$ encodes residuals given $M$. A decrease $\Delta L_{\text{tot}}<0$ corresponds to realized compression. PCD treats a computable, local $\widehat{\Phi}$ as a proxy for (the negative of) an achievable $\Delta L_{\text{tot}}$; thus $\dot x=-\nabla\widehat{\Phi}$ implements a descent in achievable codelength under the chosen surrogate. 
+This identification is heuristic and intended only as a modelling analogy.
 
 \paragraph{Minimal explicit coding scheme.}
 Let $(i,j)$ range over a symmetric set of ``near'' pairs. A two-part code describes (i) a shared pairwise template per distance bin and (ii) residual offsets:
@@ -167,7 +163,7 @@ Given fixed $(\widehat{\Phi},\text{params})$, declare the instance falsified if:
 \end{enumerate}
 
 \section{Discussion and Scope}
-PCD supplies a reproducible route from \emph{computable} information-motivated functionals to concrete dynamics. That simple pairwise surrogates coincide with familiar inverse-square interactions is a feature for validation, not a claim of novelty. Future work will broaden $\widehat{\Phi}$ (e.g.\ learned local codes, graph Laplacians) under the same preregistration discipline.
+PCD supplies a reproducible route from \emph{computable} information-motivated functionals to concrete dynamics. Future work will extend this framework to broader estimator families under the same preregistration discipline.
 
 \section*{Acknowledgments}
 We thank colleagues for discussions on local estimators, kernels, integrators, and $N$-body numerics. Earlier drafts that explored alternative framings are superseded by this methodological formulation.
