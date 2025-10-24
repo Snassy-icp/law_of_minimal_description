@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LMD Live — Compression → Gravity (One‑Page)</title>
+  <style>
+    :root {
+      --bg: #0b0f14;
+      --panel: #0f1720;
+      --ink: #e6f0ff;
+      --muted: #98a2b3;
+      --accent: #22d3ee;
+      --brand: #3b82f6;
+      --green: #22c55e;
+      --border: #1e293b;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+      color: var(--ink); background: radial-gradient(1200px 600px at 70% -20%, #112032, var(--bg));
+    }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 20px; }
+    header { margin-bottom: 14px; }
+    h1 { margin: 0 0 4px 0; font-size: 20px; font-weight: 700; letter-spacing: 0.2px; }
+    p.lead { margin: 0; color: var(--muted); font-size: 13px; }
+
+    .board { display: grid; grid-template-columns: 1fr 290px; gap: 14px; align-items: start; }
+    @media (max-width: 880px) { .board { grid-template-columns: 1fr; } }
+
+    .stage { position: relative; border-radius: 14px; overflow: hidden; background: #020617; border: 1px solid var(--border); height: 560px; }
+    canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+    .hud { position: absolute; left: 10px; bottom: 10px; background: rgba(0,0,0,0.55); color: #fff; padding: 6px 8px; border-radius: 8px; font-size: 12px; border: 1px solid rgba(255,255,255,0.08); }
+
+    .panel { background: linear-gradient(180deg, rgba(15,23,32,0.9), rgba(10,16,25,0.9)); border: 1px solid var(--border); border-radius: 14px; padding: 12px; }
+    .row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; margin: 8px 0; }
+    .row label { font-size: 12px; color: var(--muted); }
+    .row output { font-size: 12px; color: #cbd5e1; }
+
+    .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 6px; }
+    .controls button { padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border); background: #0b1220; color: #fff; cursor: pointer; font-weight: 600; font-size: 13px; letter-spacing: 0.2px; }
+    .controls button.primary { background: #0a1a2e; border-color: #14334f; }
+    .controls button:active { transform: translateY(1px); }
+    .toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; }
+    .toggle { display: flex; align-items: center; gap: 8px; background: #0b1220; border: 1px solid var(--border); padding: 8px; border-radius: 10px; font-size: 12px; color: #d0d8e6; }
+
+    input[type="range"] { width: 100%; appearance: none; height: 4px; background: #0b1220; border-radius: 999px; outline: none; border: 1px solid #132336; }
+    input[type="range"]::-webkit-slider-thumb { appearance: none; width: 16px; height: 16px; background: var(--brand); border-radius: 50%; border: 2px solid #e5efff; box-shadow: 0 0 0 3px rgba(59,130,246,0.25); }
+
+    .note { color: var(--muted); font-size: 12px; margin-top: 8px; }
+    .chip { display:inline-flex; align-items:center; gap:6px; background:#0b1220; border:1px solid var(--border); border-radius:999px; padding:4px 8px; font-size:11px; color:#cbd5e1; }
+    .dot { width:8px; height:8px; border-radius:999px; background: var(--green); box-shadow: 0 0 12px var(--green); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>📉 LMD Live — Compression → Gravity</h1>
+      <p class="lead">Particles evolve by descending a simple MDL‑inspired potential \(\Phi\). Toggle underdamped dynamics for graceful flows; watch \(\Phi\) become more negative as structure forms.</p>
+    </header>
+
+    <section class="board">
+      <div class="stage" id="stage">
+        <canvas id="trail"></canvas>
+        <canvas id="main"></canvas>
+        <div class="hud" id="hud">Φ: —, t: 0.00s, N: —</div>
+      </div>
+
+      <aside class="panel">
+        <div class="controls">
+          <button id="play" class="primary">⏸ Pause</button>
+          <button id="reset">↺ Reset</button>
+        </div>
+        <div class="controls">
+          <button id="modeU" class="primary">Underdamped</button>
+          <button id="modeD">Pure Descent</button>
+        </div>
+
+        <div class="row"><label>Particles</label><output id="oN"></output></div>
+        <input id="iN" type="range" min="20" max="400" step="1" value="140" />
+
+        <div class="row"><label>k‑NN (sparsity)</label><output id="oK"></output></div>
+        <input id="iK" type="range" min="2" max="40" step="1" value="10" />
+
+        <div class="row"><label>Time step</label><output id="oDt"></output></div>
+        <input id="iDt" type="range" min="0.004" max="0.04" step="0.001" value="0.016" />
+
+        <div class="row"><label>Damping γ</label><output id="oG"></output></div>
+        <input id="iG" type="range" min="0.00" max="1.00" step="0.01" value="0.60" />
+
+        <div class="row"><label>Softening ε (px)</label><output id="oS"></output></div>
+        <input id="iS" type="range" min="1" max="20" step="0.5" value="6" />
+
+        <div class="row"><label>Speed</label><output id="oSpeed"></output></div>
+        <input id="iSpeed" type="range" min="0.25" max="3.0" step="0.05" value="1.0" />
+
+        <div class="toggles">
+          <label class="toggle"><input type="checkbox" id="tEdges" checked/> Edges</label>
+          <label class="toggle"><input type="checkbox" id="tField"/> Field tint</label>
+        </div>
+
+        <p class="note"><span class="chip"><span class="dot"></span> Tip</span> Increase N and lower ε for sharper clustering. Underdamped + modest γ yields filamentary flows and quasi‑orbits.</p>
+      </aside>
+    </section>
+  </div>
+
+  <script>
+  // -------- Helpers -------- //
+  const TAU = Math.PI * 2;
+  const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+  const rand = (a,b)=>a + Math.random()*(b-a);
+
+  function kNNIndices(positions, k) {
+    const n = positions.length; const neighbors = new Array(n);
+    for (let i=0;i<n;i++){
+      const xi = positions[i]; const dists=[];
+      for (let j=0;j<n;j++) if (j!==i){
+        const xj=positions[j]; const dx=xi.x-xj.x, dy=xi.y-xj.y; const d2=dx*dx+dy*dy; dists.push([d2,j]);
+      }
+      dists.sort((a,b)=>a[0]-b[0]);
+      neighbors[i] = dists.slice(0, k).map(d=>d[1]);
+    }
+    return neighbors;
+  }
+
+  // -------- State -------- //
+  const stage = document.getElementById('stage');
+  const canT = document.getElementById('trail');
+  const canM = document.getElementById('main');
+  const hud = document.getElementById('hud');
+  const dpr = window.devicePixelRatio || 1;
+  let running = true;
+  let mode = 'underdamped'; // 'descent' | 'underdamped'
+  let N = 140, K = 10, DT = 0.016, GAMMA = 0.60, SOFT = 6.0, SPEED = 1.0;
+  let state = { positions: [], velocities: [], neighbors: [], phi: 0, t: 0 };
+
+  function resize() {
+    const rect = stage.getBoundingClientRect();
+    const w = Math.floor(rect.width * dpr);
+    const h = Math.floor(rect.height * dpr);
+    [canT, canM].forEach(c=>{ c.width=w; c.height=h; c.style.width=rect.width+'px'; c.style.height=rect.height+'px'; });
+  }
+  new ResizeObserver(resize).observe(stage); resize();
+
+  function randomize() {
+    const w = canM.width, h = canM.height;
+    state.positions = Array.from({length:N}, ()=>({ x: rand(w*0.2,w*0.8), y: rand(h*0.2,h*0.8) }));
+    state.velocities = Array.from({length:N}, ()=>({ x: rand(-0.15,0.15), y: rand(-0.15,0.15) }));
+    state.t = 0; state.phi = 0;
+    canT.getContext('2d').clearRect(0,0,canT.width, canT.height);
+    state.neighbors = kNNIndices(state.positions, Math.min(K, Math.max(1,N-1)));
+  }
+  randomize();
+
+  // -------- Physics -------- //
+  function step() {
+    const W = canM.width, H = canM.height;
+    const eps = SOFT * dpr;
+    const { positions, velocities } = state;
+
+    if (((state.t*60)|0) % 10 === 0) {
+      state.neighbors = kNNIndices(positions, Math.min(K, Math.max(1,N-1)));
+    }
+
+    const accX = new Float32Array(N); const accY = new Float32Array(N);
+    let phi = 0; const seen = new Set();
+    for (let i=0;i<N;i++){
+      const neigh = state.neighbors[i];
+      for (let z=0; z<neigh.length; z++){
+        const j = neigh[z];
+        const key = i<j ? (i+":"+j) : (j+":"+i); if (seen.has(key)) continue; seen.add(key);
+        const xi=positions[i], xj=positions[j];
+        const dx=xj.x - xi.x, dy=xj.y - xi.y; const r2 = dx*dx + dy*dy + eps*eps; const r = Math.sqrt(r2);
+        phi += -1 / r; const invr3 = 1/(r2*r);
+        const fx = dx * invr3, fy = dy * invr3;
+        accX[i] += fx; accY[i] += fy; accX[j] -= fx; accY[j] -= fy;
+      }
+    }
+
+    const h = DT * SPEED;
+    for (let i=0;i<N;i++){
+      if (mode === 'descent') {
+        velocities[i].x = accX[i] * h; velocities[i].y = accY[i] * h;
+      } else {
+        velocities[i].x = (1 - GAMMA*h) * velocities[i].x + accX[i]*h;
+        velocities[i].y = (1 - GAMMA*h) * velocities[i].y + accY[i]*h;
+      }
+      positions[i].x += velocities[i].x * h * 60;
+      positions[i].y += velocities[i].y * h * 60;
+      if (positions[i].x < 8) { positions[i].x = 8; velocities[i].x *= -0.7; }
+      if (positions[i].x > W-8) { positions[i].x = W-8; velocities[i].x *= -0.7; }
+      if (positions[i].y < 8) { positions[i].y = 8; velocities[i].y *= -0.7; }
+      if (positions[i].y > H-8) { positions[i].y = H-8; velocities[i].y *= -0.7; }
+    }
+
+    state.phi = phi; state.t += h;
+  }
+
+  // -------- Rendering -------- //
+  const show = { edges: true, field: false };
+  function draw(){
+    const ctx = canM.getContext('2d');
+    const tctx = canT.getContext('2d');
+    tctx.globalCompositeOperation = 'source-over';
+    tctx.fillStyle = 'rgba(0,0,0,0.07)';
+    tctx.fillRect(0,0,canT.width, canT.height);
+
+    ctx.clearRect(0,0,canM.width, canM.height);
+    const { positions } = state;
+
+    if (show.field){
+      ctx.globalAlpha = 0.15;
+      for (let i=0;i<positions.length;i++){
+        const p = positions[i]; const r = 26 * dpr;
+        const g = ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,r);
+        g.addColorStop(0, '#18a34a'); g.addColorStop(1,'transparent');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x,p.y,r,0,TAU); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    if (show.edges){
+      ctx.globalAlpha = 0.45; ctx.lineWidth = 1.0 * dpr; ctx.strokeStyle = '#22d3ee';
+      const seen = new Set();
+      for (let i=0;i<N;i++){
+        const neigh = state.neighbors[i];
+        for (let z=0; z<neigh.length; z++){
+          const j = neigh[z]; const key = i<j ? (i+":"+j) : (j+":"+i); if (seen.has(key)) continue; seen.add(key);
+          const a = positions[i], b = positions[j];
+          ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+        }
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    for (let i=0;i<N;i++){
+      const p = positions[i];
+      tctx.beginPath(); tctx.fillStyle = 'rgba(59,130,246,0.9)'; tctx.arc(p.x,p.y,1.2*dpr,0,TAU); tctx.fill();
+      ctx.beginPath(); ctx.fillStyle = '#fff'; ctx.arc(p.x,p.y,2.0*dpr,0,TAU); ctx.fill();
+    }
+
+    hud.textContent = `Φ: ${state.phi.toFixed(3)}, t: ${state.t.toFixed(2)}s, N: ${N}`;
+  }
+
+  // -------- Loop -------- //
+  function loop(){ if (running) step(); draw(); requestAnimationFrame(loop); }
+  requestAnimationFrame(loop);
+
+  // -------- UI Wiring -------- //
+  const $ = (id)=>document.getElementById(id);
+  function bindRange(id, out, fmt, on){ const el=$(id), o=$(out); const set=()=>{ o.textContent = fmt(parseFloat(el.value)); on(parseFloat(el.value)); }; el.addEventListener('input', set); set(); }
+
+  bindRange('iN','oN',v=>v,(v)=>{ N=v|0; randomize(); });
+  bindRange('iK','oK',v=>v,(v)=>{ K=v|0; state.neighbors = kNNIndices(state.positions, Math.min(K, Math.max(1,N-1))); });
+  bindRange('iDt','oDt',v=>v.toFixed(3),(v)=>{ DT=v; });
+  bindRange('iG','oG',v=>v.toFixed(2),(v)=>{ GAMMA=v; });
+  bindRange('iS','oS',v=>v.toFixed(1),(v)=>{ SOFT=v; });
+  bindRange('iSpeed','oSpeed',v=>v.toFixed(2)+'×',(v)=>{ SPEED=v; });
+
+  $('play').addEventListener('click', ()=>{ running=!running; $('play').textContent = running ? '⏸ Pause' : '▶ Play'; });
+  $('reset').addEventListener('click', ()=> randomize());
+  $('modeU').addEventListener('click', ()=>{ mode='underdamped'; $('modeU').classList.add('primary'); $('modeD').classList.remove('primary'); });
+  $('modeD').addEventListener('click', ()=>{ mode='descent'; $('modeD').classList.add('primary'); $('modeU').classList.remove('primary'); });
+  $('tEdges').addEventListener('change', e=> show.edges = !!e.target.checked);
+  $('tField').addEventListener('change', e=> show.field = !!e.target.checked);
+  </script>
+</body>
+</html>

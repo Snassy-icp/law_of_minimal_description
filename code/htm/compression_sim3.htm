@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LMD Live — Compression → Gravity (One‑Page, Discovery Mode)</title>
+  <style>
+    :root {
+      --bg: #0b0f14; --panel: #0f1720; --ink: #e6f0ff; --muted: #98a2b3; --accent: #22d3ee; --brand: #3b82f6; --green: #22c55e; --border: #1e293b;
+      --warn: #f59e0b; --danger:#ef4444; --ok:#10b981;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans"; color: var(--ink); background: radial-gradient(1200px 600px at 70% -20%, #112032, var(--bg)); }
+    .wrap { max-width: 1150px; margin: 0 auto; padding: 20px; }
+    header { margin-bottom: 14px; }
+    h1 { margin: 0 0 4px 0; font-size: 20px; font-weight: 700; letter-spacing: 0.2px; }
+    p.lead { margin: 0; color: var(--muted); font-size: 13px; }
+
+    .board { display: grid; grid-template-columns: 1fr 380px; gap: 14px; align-items: start; }
+    @media (max-width: 980px) { .board { grid-template-columns: 1fr; } }
+
+    .stage { position: relative; border-radius: 14px; overflow: hidden; background: #020617; border: 1px solid var(--border); height: 560px; }
+    canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    .hud { position: absolute; left: 10px; bottom: 10px; background: rgba(0,0,0,0.55); color: #fff; padding: 6px 8px; border-radius: 8px; font-size: 12px; border: 1px solid rgba(255,255,255,0.08); }
+
+    .panel { background: linear-gradient(180deg, rgba(15,23,32,0.9), rgba(10,16,25,0.9)); border: 1px solid var(--border); border-radius: 14px; padding: 12px; }
+    .row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; margin: 8px 0; }
+    .row label { font-size: 12px; color: var(--muted); }
+    .row output { font-size: 12px; color: #cbd5e1; }
+
+    .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 6px; }
+    .controls button { padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border); background: #0b1220; color: #fff; cursor: pointer; font-weight: 600; font-size: 13px; letter-spacing: 0.2px; }
+    .controls button.primary { background: #0a1a2e; border-color: #14334f; }
+    .controls button:active { transform: translateY(1px); }
+
+    .toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; }
+    .toggle { display: flex; align-items: center; gap: 8px; background: #0b1220; border: 1px solid var(--border); padding: 8px; border-radius: 10px; font-size: 12px; color: #d0d8e6; }
+
+    input[type="range"] { width: 100%; appearance: none; height: 4px; background: #0b1220; border-radius: 999px; outline: none; border: 1px solid #132336; }
+    input[type="range"]::-webkit-slider-thumb { appearance: none; width: 16px; height: 16px; background: var(--brand); border-radius: 50%; border: 2px solid #e5efff; box-shadow: 0 0 0 3px rgba(59,130,246,0.25); }
+
+    .note { color: var(--muted); font-size: 12px; margin-top: 8px; }
+    .chip { display:inline-flex; align-items:center; gap:6px; background:#0b1220; border:1px solid var(--border); border-radius:999px; padding:4px 8px; font-size:11px; color:#cbd5e1; }
+    .dot { width:8px; height:8px; border-radius:999px; background: var(--green); box-shadow: 0 0 12px var(--green); }
+
+    .metrics { display:grid; grid-template-columns: repeat(3,1fr); gap:6px; margin-top:8px; }
+    .metric { background:#0b1220; border:1px solid var(--border); border-radius:10px; padding:6px 8px; font-size:11px; color:#cbd5e1; }
+    .metric b { color:#e5eefc; font-weight:700; }
+
+    .log { background:#07101b; border:1px solid var(--border); border-radius:10px; padding:8px; height:160px; overflow:auto; font-size:11px; color:#cbd5e1; }
+    .ev { margin:2px 0; }
+    .ev .t { color:#9ca3af; }
+    .ev.jet { color:#60a5fa; }
+    .ev.boom { color:#fbbf24; }
+    .ev.sling { color:#34d399; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>📉 LMD Live — Compression → Gravity</h1>
+      <p class="lead">Discovery Mode with event detection (jets, isotropic pops, slingshots), metrics HUD, optional Newtonian overlay. Density map removed for speed.</p>
+    </header>
+
+    <section class="board">
+      <div class="stage" id="stage">
+        <canvas id="trail"></canvas>
+        <canvas id="main"></canvas>
+        <div class="hud" id="hud">Φ: —, t: 0.00s, N: —</div>
+      </div>
+
+      <aside class="panel">
+        <div class="controls">
+          <button id="play" class="primary">⏸ Pause</button>
+          <button id="reset">↺ Reset</button>
+        </div>
+        <div class="controls">
+          <button id="modeU" class="primary">Underdamped</button>
+          <button id="modeD">Pure Descent</button>
+        </div>
+
+        <div class="row"><label>Particles</label><output id="oN"></output></div>
+        <input id="iN" type="range" min="20" max="800" step="1" value="260" />
+
+        <div class="row"><label>k‑NN (sparsity)</label><output id="oK"></output></div>
+        <input id="iK" type="range" min="2" max="48" step="1" value="12" />
+
+        <div class="row"><label>Time step</label><output id="oDt"></output></div>
+        <input id="iDt" type="range" min="0.004" max="0.06" step="0.001" value="0.016" />
+
+        <div class="row"><label>Damping γ</label><output id="oG"></output></div>
+        <input id="iG" type="range" min="0.00" max="1.00" step="0.01" value="0.60" />
+
+        <div class="row"><label>Softening ε (px)</label><output id="oS"></output></div>
+        <input id="iS" type="range" min="1" max="20" step="0.5" value="6" />
+
+        <div class="row"><label>Speed</label><output id="oSpeed"></output></div>
+        <input id="iSpeed" type="range" min="0.25" max="3.0" step="0.05" value="1.2" />
+
+        <div class="row"><label>Collision radius ×</label><output id="oCR"></output></div>
+        <input id="iCR" type="range" min="0.8" max="2.5" step="0.05" value="1.2" />
+
+        <div class="controls">
+          <button id="colNone" class="primary">No Collisions</button>
+          <button id="colBounce">Bounce</button>
+        </div>
+        <div class="controls">
+          <button id="colMerge">Merge</button>
+          <button id="eco" class="primary">Eco Mode</button>
+        </div>
+
+        <div class="toggles">
+          <label class="toggle"><input type="checkbox" id="tMassSize" checked/> Size by mass</label>
+          <label class="toggle"><input type="checkbox" id="tEdges" checked/> Edges</label>
+          <label class="toggle"><input type="checkbox" id="tDisc"/> Discovery Mode</label>
+          <label class="toggle"><input type="checkbox" id="tNewt"/> Newtonian overlay</label>
+        </div>
+
+        <div class="metrics">
+          <div class="metric"><b>K</b> <span id="mK">—</span></div>
+          <div class="metric"><b>|L|</b> <span id="mL">—</span></div>
+          <div class="metric"><b>a<sub>max</sub></b> <span id="mA">—</span></div>
+          <div class="metric"><b>C</b> <span id="mC">—</span></div>
+          <div class="metric"><b>v<sub>95</sub></b> <span id="mV">—</span></div>
+          <div class="metric"><b>events</b> <span id="mE">0</span></div>
+        </div>
+
+        <div class="row" style="margin-top:8px;align-items:start;">
+          <label style="align-self:start;">Event log</label>
+          <div>
+            <button id="dlCsv">⬇ CSV</button>
+          </div>
+        </div>
+        <div class="log" id="log"></div>
+
+        <p class="note"><span class="chip"><span class="dot"></span> Tip</span> Discovery Mode detects bursts: <span style="color:#fbbf24;">isotropic</span>, <span style="color:#60a5fa;">bipolar jets</span>, and <span style="color:#34d399;">slingshots</span>. Toggle Newtonian overlay to compare.</p>
+      </aside>
+    </section>
+  </div>
+
+  <script>
+  // Boot when DOM is ready to avoid null elements
+  (function(){
+    const start = () => {
+      // ===== Helpers =====
+      const TAU=Math.PI*2; const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)); const rand=(a,b)=>a+Math.random()*(b-a);
+      const $ = id => document.getElementById(id);
+      const on = (id, evt, fn) => { const el = $(id); if(!el){ console.warn('Missing element for', id); return; } el.addEventListener(evt, fn); };
+      function buildGrid(positions, cell){ const grid=new Map(); for(let i=0;i<positions.length;i++){ const p=positions[i]; const gx=(p.x/cell)|0, gy=(p.y/cell)|0; const key=gx+','+gy; if(!grid.has(key)) grid.set(key,[]); grid.get(key).push(i);} return grid; }
+      function candidates(i, positions, grid, cell){ const p=positions[i]; const gx=(p.x/cell)|0, gy=(p.y/cell)|0; const out=[]; for(let dx=-1;dx<=1;dx++) for(let dy=-1;dy<=1;dy++){ const key=(gx+dx)+','+(gy+dy); const arr=grid.get(key); if(arr) for(const j of arr) if(j!==i) out.push(j);} return out; }
+      function kNNGrid(positions,k,cell){ const n=positions.length,res=new Array(n),grid=buildGrid(positions,cell); for(let i=0;i<n;i++){ const cand=candidates(i,positions,grid,cell); if(!cand.length){res[i]=[];continue;} const d=[]; const xi=positions[i]; for(const j of cand){ const xj=positions[j]; const dx=xi.x-xj.x, dy=xi.y-xj.y; d.push([dx*dx+dy*dy,j]); } d.sort((a,b)=>a[0]-b[0]); res[i]=d.slice(0,k).map(v=>v[1]); } return res; }
+
+      // ===== State =====
+      const stage=$('stage'); const canT=$('trail'); const canM=$('main'); const hud=$('hud'); const dpr=window.devicePixelRatio||1;
+      let running=true, mode='underdamped'; let N=260, K=12, DT=0.016, GAMMA=0.6, SOFT=6.0, SPEED=1.2, CR=1.2; let collisionMode='none', eco=true;
+      let show={ massSize:true, edges:true, discovery:false, newton:false };
+      let state={ positions:[], velocities:[], neighbors:[], masses:[], alive:[], phi:0, t:0 };
+      let newt={ positions:[], velocities:[], masses:[], alive:[] }; // Newtonian overlay
+
+      function resize(){ if(!stage) return; const r=stage.getBoundingClientRect(); const w=(r.width*dpr)|0, h=(r.height*dpr)|0; [canT,canM].forEach(c=>{ if(!c) return; c.width=w; c.height=h; c.style.width=r.width+'px'; c.style.height=r.height+'px'; }); }
+      if (stage) { new ResizeObserver(resize).observe(stage); }
+      resize();
+
+      function computeMasses(){ const base=0.6, beta=1.2; const n=state.positions.length; const masses=new Float32Array(n); for(let i=0;i<n;i++){ const deg=(state.neighbors[i]||[]).length; const m=base + beta*(deg/Math.max(1,K)); masses[i]=Math.min(m,2.2);} state.masses=masses; }
+      function randomize(){ const w=canM.width||800,h=canM.height||600; state.positions=Array.from({length:N},()=>({x:rand(w*0.2,w*0.8),y:rand(h*0.2,h*0.8)})); state.velocities=Array.from({length:N},()=>({x:rand(-0.15,0.15),y:rand(-0.15,0.15)})); state.alive=new Array(N).fill(true); state.t=0; state.phi=0; const tctx=canT?.getContext('2d'); tctx?.clearRect(0,0,canT.width,canT.height); state.neighbors=kNNGrid(state.positions,Math.min(K,Math.max(1,N-1)),40*dpr); computeMasses();
+        // Newtonian overlay initialised with same ICs
+        newt.positions=state.positions.map(p=>({x:p.x,y:p.y})); newt.velocities=state.velocities.map(v=>({x:v.x,y:v.y})); newt.masses=new Float32Array(new Array(N).fill(1)); newt.alive=new Array(N).fill(true);
+      }
+      randomize();
+
+      function softRadius(i){ return (show.massSize ? (1.5 + 1.2*state.masses[i]) : 2.0) * dpr * CR; }
+
+      // ===== Physics (MDL) =====
+      function stepMDL(){ const W=canM.width,H=canM.height,eps=SOFT*dpr; const pos=state.positions, vel=state.velocities, m=state.masses; const frame=(state.t*60)|0; if(frame%(eco?20:10)===0){ state.neighbors=kNNGrid(pos,Math.min(K,Math.max(1,N-1)),40*dpr); computeMasses(); }
+        const accX=new Float32Array(N),accY=new Float32Array(N); let phi=0; const seen=new Set();
+        for(let i=0;i<N;i++){ if(!state.alive[i]) continue; const neigh=state.neighbors[i]||[]; for(const j of neigh){ if(!state.alive[j]) continue; const key=i<j?i+":"+j:j+":"+i; if(seen.has(key)) continue; seen.add(key); const xi=pos[i], xj=pos[j]; let dx=xj.x-xi.x, dy=xj.y-xi.y; let r2=Math.max(dx*dx+dy*dy, eps*eps); let r=Math.sqrt(r2); phi += -1/r; const invr3=1/(r2*r); const mi=m[i], mj=m[j]; const fx=dx*invr3, fy=dy*invr3; accX[i]+=mj*fx; accY[i]+=mj*fy; accX[j]-=mi*fx; accY[j]-=mi*fy; // collisions
+            const minDist=softRadius(i)+softRadius(j); if(r<minDist && collisionMode!=='none'){ if(collisionMode==='merge'){ const M=mi+mj; const vx=(mi*vel[i].x+mj*vel[j].x)/M, vy=(mi*vel[i].y+mj*vel[j].y)/M; xi.x=(mi*xi.x+mj*xj.x)/M; xi.y=(mi*xi.y+mj*xj.y)/M; vel[i].x=vx; vel[i].y=vy; state.masses[i]=M; state.alive[j]=false; } else { const nx=dx/(r+1e-6), ny=dy/(r+1e-6); const overlap=(minDist-r); xi.x-=nx*overlap*0.5; xi.y-=ny*overlap*0.5; xj.x+=nx*overlap*0.5; xj.y+=ny*overlap*0.5; const vi=vel[i], vj=vel[j]; const rel=(vi.x-vj.x)*nx+(vi.y-vj.y)*ny; if(rel>0){ const e=0.2; const imp=(1+e)*rel/(1/mi+1/mj); vi.x-=(imp/mi)*nx; vi.y-=(imp/mi)*ny; vj.x+=(imp/mj)*nx; vj.y+=(imp/mj)*ny; } } }
+          }
+        }
+        const h=DT*SPEED; for(let i=0;i<N;i++){ if(!state.alive[i]) continue; if(mode==='descent'){ vel[i].x=accX[i]*h; vel[i].y=accY[i]*h; } else { vel[i].x=(1-GAMMA*h)*vel[i].x+accX[i]*h; vel[i].y=(1-GAMMA*h)*vel[i].y+accY[i]*h; } // mild clamps
+          vel[i].x=clamp(vel[i].x,-2,2); vel[i].y=clamp(vel[i].y,-2,2);
+          pos[i].x+=vel[i].x*h*60; pos[i].y+=vel[i].y*h*60; if(pos[i].x<8){pos[i].x=8; vel[i].x*=-0.7;} if(pos[i].x>W-8){pos[i].x=W-8; vel[i].x*=-0.7;} if(pos[i].y<8){pos[i].y=8; vel[i].y*=-0.7;} if(pos[i].y>H-8){pos[i].y=H-8; vel[i].y*=-0.7;} }
+        state.phi=phi; state.t+=h;
+      }
+
+      // ===== Physics (Newtonian overlay) =====
+      function stepNewton(){ if(!show.newton) return; const W=canM.width,H=canM.height; const G=2000/(W+H); const eps=SOFT*dpr; const pos=newt.positions, vel=newt.velocities, nN=pos.length; const h=DT*SPEED; for(let i=0;i<nN;i++){ let ax=0, ay=0; for(let j=i+1;j<nN;j++){ const dx=pos[j].x-pos[i].x, dy=pos[j].y-pos[i].y; const r2=Math.max(dx*dx+dy*dy, eps*eps); const r=Math.sqrt(r2); const invr3=1/(r2*r); const s=G*invr3; const fx=dx*s, fy=dy*s; ax+=fx; ay+=fy; newt.velocities[j].x-=fx*h; newt.velocities[j].y-=fy*h; } newt.velocities[i].x+=ax*h; newt.velocities[i].y+=ay*h; }
+        for(let i=0;i<nN;i++){ pos[i].x+=vel[i].x*h*60; pos[i].y+=vel[i].y*h*60; if(pos[i].x<8||pos[i].x>W-8) vel[i].x*=-0.7; if(pos[i].y<8||pos[i].y>H-8) vel[i].y*=-0.7; }
+      }
+
+      // ===== Metrics & Events =====
+      const logEl=$('log'); const mK=$('mK'), mL=$('mL'), mA=$('mA'), mC=$('mC'), mV=$('mV'), mE=$('mE');
+      let events=[]; function addEvent(kind, info){ const t=state.t.toFixed(2); events.push({t,kind,...info}); if(mE) mE.textContent=events.length; if(logEl){ const div=document.createElement('div'); div.className='ev '+kind; div.innerHTML=`<span class="t">[t=${t}s]</span> ${kind} — ${info.note||''}`; logEl.appendChild(div); logEl.scrollTop=logEl.scrollHeight; } }
+      function metrics(){ const pos=state.positions, vel=state.velocities, m=state.masses; let K=0, Lx=0, Ly=0, aMax=0, v95=0; const speeds=[]; for(let i=0;i<N;i++){ if(!state.alive[i]) continue; const v2=vel[i].x*vel[i].x+vel[i].y*vel[i].y; K += 0.5*(m[i]||1)*v2; Lx += (m[i]||1)*(pos[i].x*vel[i].y - pos[i].y*vel[i].x); speeds.push(Math.sqrt(v2)); }
+        speeds.sort((a,b)=>a-b); v95 = speeds[(speeds.length*0.95)|0]||0; // compactness C via mean 1st-NN distance
+        let C=0; if(state.neighbors.length){ for(let i=0;i<N;i++){ const n=state.neighbors[i]||[]; if(n.length){ const j=n[0]; const dx=pos[i].x-pos[j].x, dy=pos[i].y-pos[j].y; C+=Math.hypot(dx,dy); } } C/=N; }
+        if(mK) mK.textContent=K.toFixed(3); if(mL) mL.textContent=Math.hypot(Lx,Ly).toFixed(3); if(mA) mA.textContent=aMax.toFixed(3); if(mC) mC.textContent=(C||0).toFixed(1); if(mV) mV.textContent=v95.toFixed(2);
+        return {K,L:Math.hypot(Lx,Ly),aMax:v95, C, v95}; // reuse v95 as a crude accel proxy for thresholds
+      }
+
+      function classify(){ if(!show.discovery) return; const n=N; // headings and speeds
+        const hs=[]; for(let i=0;i<n;i++){ if(!state.alive[i]) continue; const s=Math.hypot(state.velocities[i].x, state.velocities[i].y); if(s>0.6){ hs.push(Math.atan2(state.velocities[i].y, state.velocities[i].x)); } }
+        if(hs.length<8) return; // principal direction via circular variance
+        let cx=0, cy=0; for(const a of hs){ cx+=Math.cos(a); cy+=Math.sin(a); } const R=Math.hypot(cx,cy)/hs.length; // R≈1 → aligned, R≈0 → isotropic
+        if(R<0.35 && hs.length>n*0.05){ addEvent('boom',{note:`isotropic burst, count=${hs.length}`}); }
+        if(R>0.85 && hs.length>n*0.03){ addEvent('jet',{note:`bipolar/jet structure, align=${R.toFixed(2)}`}); }
+        // Slingshot: look for single very fast outlier
+        let vmax=0; for(let i=0;i<n;i++){ const s=Math.hypot(state.velocities[i].x, state.velocities[i].y); if(s>vmax){ vmax=s; } }
+        if(vmax > 3.0){ addEvent('sling',{note:`fast outlier v=${vmax.toFixed(2)}`}); }
+      }
+
+      // ===== Rendering =====
+      function draw(){ const ctx=canM.getContext('2d'); const tctx=canT.getContext('2d'); if(!ctx||!tctx) return; tctx.globalCompositeOperation='source-over'; tctx.fillStyle='rgba(0,0,0,0.10)'; tctx.fillRect(0,0,canT.width,canT.height); ctx.clearRect(0,0,canM.width,canM.height);
+        if(show.edges && (!eco || N<=380)){ ctx.globalAlpha=0.45; ctx.lineWidth=1.0*dpr; ctx.strokeStyle='#22d3ee'; const seen=new Set(); for(let i=0;i<N;i++){ if(!state.alive[i]) continue; const neigh=state.neighbors[i]||[]; for(const j of neigh){ if(!state.alive[j]) continue; const key=i<j?i+":"+j:j+":"+i; if(seen.has(key)) continue; seen.add(key); const a=state.positions[i], b=state.positions[j]; ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); } } ctx.globalAlpha=1; }
+        for(let i=0;i<N;i++){ if(!state.alive[i]) continue; const p=state.positions[i]; const r=softRadius(i); tctx.beginPath(); tctx.fillStyle='rgba(59,130,246,0.9)'; tctx.arc(p.x,p.y,1.0*dpr,0,TAU); tctx.fill(); ctx.beginPath(); ctx.fillStyle='#fff'; ctx.arc(p.x,p.y,r,0,TAU); ctx.fill(); }
+        if(show.newton){ ctx.globalAlpha=0.8; for(let i=0;i<newt.positions.length;i++){ const q=newt.positions[i]; ctx.beginPath(); ctx.fillStyle='rgba(255,196,0,0.65)'; ctx.arc(q.x,q.y,1.5*dpr,0,TAU); ctx.fill(); } ctx.globalAlpha=1; }
+        if(hud) hud.textContent=`Φ: ${state.phi.toFixed(3)}, t: ${state.t.toFixed(2)}s, N: ${N}`; metrics(); if(show.discovery) classify(); }
+
+      // ===== Loop =====
+      function loop(){ if(running){ stepMDL(); if(show.newton) stepNewton(); } draw(); requestAnimationFrame(loop); } requestAnimationFrame(loop);
+
+      // ===== UI =====
+      function bindRange(id,out,fmt,onChange){ const el=$(id), o=$(out); if(!el||!o){ console.warn('Missing range elements', id, out); return; } const set=()=>{ const val=parseFloat(el.value); o.textContent=fmt(val); onChange(val); }; el.addEventListener('input',set); set(); }
+      bindRange('iN','oN',v=>v,(v)=>{ N=v|0; randomize(); });
+      bindRange('iK','oK',v=>v,(v)=>{ K=v|0; state.neighbors=kNNGrid(state.positions,Math.min(K,Math.max(1,N-1)),40*dpr); computeMasses(); });
+      bindRange('iDt','oDt',v=>v.toFixed(3),(v)=>{ DT=v; });
+      bindRange('iG','oG',v=>v.toFixed(2),(v)=>{ GAMMA=v; });
+      bindRange('iS','oS',v=>v.toFixed(1),(v)=>{ SOFT=v; });
+      bindRange('iSpeed','oSpeed',v=>v.toFixed(2)+'×',(v)=>{ SPEED=v; });
+      bindRange('iCR','oCR',v=>v.toFixed(2)+'×',(v)=>{ CR=v; });
+
+      on('play','click',()=>{ running=!running; const btn=$('play'); if(btn) btn.textContent=running?'⏸ Pause':'▶ Play'; });
+      on('reset','click',()=> randomize());
+      on('modeU','click',()=>{ mode='underdamped'; $('modeU')?.classList.add('primary'); $('modeD')?.classList.remove('primary'); });
+      on('modeD','click',()=>{ mode='descent'; $('modeD')?.classList.add('primary'); $('modeU')?.classList.remove('primary'); });
+
+      function setCol(modeName){ collisionMode=modeName; ['colNone','colBounce','colMerge'].forEach(id=> $(''+id)?.classList.remove('primary')); if(modeName==='none') $('colNone')?.classList.add('primary'); if(modeName==='bounce') $('colBounce')?.classList.add('primary'); if(modeName==='merge') $('colMerge')?.classList.add('primary'); }
+      on('colNone','click',()=> setCol('none'));
+      on('colBounce','click',()=> setCol('bounce'));
+      on('colMerge','click',()=> setCol('merge'));
+      setCol('none');
+
+      on('eco','click',()=>{ eco=!eco; $('eco')?.classList.toggle('primary',eco); });
+      on('tMassSize','change',e=>{ show.massSize=!!e.target.checked; });
+      on('tEdges','change',e=>{ show.edges=!!e.target.checked; });
+      on('tDisc','change',e=>{ show.discovery=!!e.target.checked; });
+      on('tNewt','change',e=>{ show.newton=!!e.target.checked; });
+
+      // ===== CSV download & tests =====
+      function toCsv(rows){ const header=['t','kind','note']; const lines=[header.join(',')]; for(const r of rows){ const safeNote = String(r.note||'').replace(/[\,\r\n]/g,' '); lines.push([r.t,r.kind,safeNote].join(',')); } return lines.join('\n'); }
+      // Basic tests to guard regressions
+      (function testToCsv(){
+        const tests=[
+          {rows:[{t:'1.00',kind:'boom',note:'hello'}], expect:'t,kind,note\n1.00,boom,hello'},
+          {rows:[{t:'2.00',kind:'jet',note:'has,comma'},{t:'3.00',kind:'sling',note:'multi\nline'}], expect:'t,kind,note\n2.00,jet,has comma\n3.00,sling,multi line'}
+        ];
+        let ok=true; for(const {rows,expect} of tests){ const got=toCsv(rows); if(got.trim()!==expect.trim()){ ok=false; console.error('toCsv test failed', {expect, got}); addEvent('boom',{note:'CSV test failed'}); break; } }
+        if(ok){ console.log('toCsv tests: OK'); addEvent('sling',{note:'CSV tests passed'}); }
+      })();
+
+      on('dlCsv','click',()=>{ const blob=new Blob([toCsv(events)],{type:'text/csv'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='events.csv'; a.click(); URL.revokeObjectURL(url); });
+    };
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', start);
+    } else {
+      start();
+    }
+  })();
+  </script>
+</body>
+</html>

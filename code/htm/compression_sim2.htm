@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LMD Live — Compression → Gravity (One‑Page, Mass & Density)</title>
+  <style>
+    :root {
+      --bg: #0b0f14;
+      --panel: #0f1720;
+      --ink: #e6f0ff;
+      --muted: #98a2b3;
+      --accent: #22d3ee;
+      --brand: #3b82f6;
+      --green: #22c55e;
+      --border: #1e293b;
+      --heatA: #0ea5e9;
+      --heatB: #22c55e;
+      --heatC: #fbbf24;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans";
+      color: var(--ink); background: radial-gradient(1200px 600px at 70% -20%, #112032, var(--bg));
+    }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 20px; }
+    header { margin-bottom: 14px; }
+    h1 { margin: 0 0 4px 0; font-size: 20px; font-weight: 700; letter-spacing: 0.2px; }
+    p.lead { margin: 0; color: var(--muted); font-size: 13px; }
+
+    .board { display: grid; grid-template-columns: 1fr 320px; gap: 14px; align-items: start; }
+    @media (max-width: 880px) { .board { grid-template-columns: 1fr; } }
+
+    .stage { position: relative; border-radius: 14px; overflow: hidden; background: #020617; border: 1px solid var(--border); height: 560px; }
+    canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+    .hud { position: absolute; left: 10px; bottom: 10px; background: rgba(0,0,0,0.55); color: #fff; padding: 6px 8px; border-radius: 8px; font-size: 12px; border: 1px solid rgba(255,255,255,0.08); }
+
+    .panel { background: linear-gradient(180deg, rgba(15,23,32,0.9), rgba(10,16,25,0.9)); border: 1px solid var(--border); border-radius: 14px; padding: 12px; }
+    .row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; margin: 8px 0; }
+    .row label { font-size: 12px; color: var(--muted); }
+    .row output { font-size: 12px; color: #cbd5e1; }
+
+    .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 6px; }
+    .controls button { padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border); background: #0b1220; color: #fff; cursor: pointer; font-weight: 600; font-size: 13px; letter-spacing: 0.2px; }
+    .controls button.primary { background: #0a1a2e; border-color: #14334f; }
+    .controls button:active { transform: translateY(1px); }
+    .toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; }
+    .toggle { display: flex; align-items: center; gap: 8px; background: #0b1220; border: 1px solid var(--border); padding: 8px; border-radius: 10px; font-size: 12px; color: #d0d8e6; }
+
+    input[type="range"] { width: 100%; appearance: none; height: 4px; background: #0b1220; border-radius: 999px; outline: none; border: 1px solid #132336; }
+    input[type="range"]::-webkit-slider-thumb { appearance: none; width: 16px; height: 16px; background: var(--brand); border-radius: 50%; border: 2px solid #e5efff; box-shadow: 0 0 0 3px rgba(59,130,246,0.25); }
+
+    .note { color: var(--muted); font-size: 12px; margin-top: 8px; }
+    .chip { display:inline-flex; align-items:center; gap:6px; background:#0b1220; border:1px solid var(--border); border-radius:999px; padding:4px 8px; font-size:11px; color:#cbd5e1; }
+    .dot { width:8px; height:8px; border-radius:999px; background: var(--green); box-shadow: 0 0 12px var(--green); }
+
+    .legend { display:flex; gap:6px; align-items:center; font-size: 11px; color:#cbd5e1; }
+    .swatch { width:10px; height:10px; border-radius:2px; background:linear-gradient(90deg, var(--heatA), var(--heatB), var(--heatC)); border:1px solid rgba(255,255,255,0.2); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>📉 LMD Live — Compression → Gravity</h1>
+      <p class="lead">Particles evolve by descending a simple MDL‑inspired potential Φ. This build includes <b>mass weighting</b> from local connectivity and an optional <b>density/potential map</b> overlay.</p>
+    </header>
+
+    <section class="board">
+      <div class="stage" id="stage">
+        <canvas id="density"></canvas>
+        <canvas id="trail"></canvas>
+        <canvas id="main"></canvas>
+        <div class="hud" id="hud">Φ: —, t: 0.00s, N: —</div>
+      </div>
+
+      <aside class="panel">
+        <div class="controls">
+          <button id="play" class="primary">⏸ Pause</button>
+          <button id="reset">↺ Reset</button>
+        </div>
+        <div class="controls">
+          <button id="modeU" class="primary">Underdamped</button>
+          <button id="modeD">Pure Descent</button>
+        </div>
+
+        <div class="row"><label>Particles</label><output id="oN"></output></div>
+        <input id="iN" type="range" min="20" max="500" step="1" value="180" />
+
+        <div class="row"><label>k‑NN (sparsity)</label><output id="oK"></output></div>
+        <input id="iK" type="range" min="2" max="48" step="1" value="12" />
+
+        <div class="row"><label>Time step</label><output id="oDt"></output></div>
+        <input id="iDt" type="range" min="0.004" max="0.05" step="0.001" value="0.016" />
+
+        <div class="row"><label>Damping γ</label><output id="oG"></output></div>
+        <input id="iG" type="range" min="0.00" max="1.00" step="0.01" value="0.60" />
+
+        <div class="row"><label>Softening ε (px)</label><output id="oS"></output></div>
+        <input id="iS" type="range" min="1" max="20" step="0.5" value="5" />
+
+        <div class="row"><label>Speed</label><output id="oSpeed"></output></div>
+        <input id="iSpeed" type="range" min="0.25" max="3.0" step="0.05" value="1.2" />
+
+        <div class="toggles">
+          <label class="toggle"><input type="checkbox" id="tEdges" checked/> Edges</label>
+          <label class="toggle"><input type="checkbox" id="tField"/> Node glow</label>
+          <label class="toggle"><input type="checkbox" id="tDensity" checked/> Density/Potential map</label>
+          <label class="toggle"><input type="checkbox" id="tMassSize" checked/> Size by mass</label>
+        </div>
+        <div class="legend"><span class="swatch"></span> density → potential tint</div>
+
+        <p class="note"><span class="chip"><span class="dot"></span> Tip</span> Local degree raises mass; acceleration on i is ∝ m<sub>j</sub>/r³. Toggle “Size by mass” to see hubs grow.</p>
+      </aside>
+    </section>
+  </div>
+
+  <script>
+  // -------- Helpers -------- //
+  const TAU = Math.PI * 2;
+  const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+  const rand = (a,b)=>a + Math.random()*(b-a);
+
+  function kNNIndices(positions, k) {
+    const n = positions.length; const neighbors = new Array(n);
+    for (let i=0;i<n;i++){
+      const xi = positions[i]; const dists=[];
+      for (let j=0;j<n;j++) if (j!==i){
+        const xj=positions[j]; const dx=xi.x-xj.x, dy=xi.y-xj.y; const d2=dx*dx+dy*dy; dists.push([d2,j]);
+      }
+      dists.sort((a,b)=>a[0]-b[0]);
+      neighbors[i] = dists.slice(0, k).map(d=>d[1]);
+    }
+    return neighbors;
+  }
+
+  // -------- State -------- //
+  const stage = document.getElementById('stage');
+  const canD = document.getElementById('density');
+  const canT = document.getElementById('trail');
+  const canM = document.getElementById('main');
+  const hud = document.getElementById('hud');
+  const dpr = window.devicePixelRatio || 1;
+  let running = true;
+  let mode = 'underdamped'; // 'descent' | 'underdamped'
+  let N = 180, K = 12, DT = 0.016, GAMMA = 0.60, SOFT = 5.0, SPEED = 1.2;
+  let state = { positions: [], velocities: [], neighbors: [], masses: [], phi: 0, t: 0 };
+
+  function resize() {
+    const rect = stage.getBoundingClientRect();
+    const w = Math.floor(rect.width * dpr);
+    const h = Math.floor(rect.height * dpr);
+    ;[canD,canT,canM].forEach(c=>{ c.width=w; c.height=h; c.style.width=rect.width+'px'; c.style.height=rect.height+'px'; });
+  }
+  new ResizeObserver(resize).observe(stage); resize();
+
+  function computeMasses() {
+    // Mass from local connectivity: m_i = base + beta * (deg_i / K)
+    // Optionally modulate by inverse mean neighbor distance for extra density sensitivity.
+    const base = 0.6, beta = 1.2, gamma = 0.4; // tunable
+    const n = state.positions.length;
+    const masses = new Float32Array(n);
+    for (let i=0;i<n;i++){
+      const neigh = state.neighbors[i];
+      let deg = neigh.length; let invAvgR = 0;
+      if (deg>0){
+        let sumR = 0;
+        const xi = state.positions[i];
+        for (let z=0; z<deg; z++){
+          const j = neigh[z], xj = state.positions[j];
+          const dx = xi.x-xj.x, dy = xi.y-xj.y; sumR += Math.hypot(dx,dy)+1e-6;
+        }
+        invAvgR = 1/(sumR/deg);
+      }
+      masses[i] = base + beta * (deg / Math.max(1,K)) + gamma * invAvgR * 0.01; // scale invAvgR down for pixels
+    }
+    state.masses = masses;
+  }
+
+  function randomize() {
+    const w = canM.width, h = canM.height;
+    state.positions = Array.from({length:N}, ()=>({ x: rand(w*0.2,w*0.8), y: rand(h*0.2,h*0.8) }));
+    state.velocities = Array.from({length:N}, ()=>({ x: rand(-0.15,0.15), y: rand(-0.15,0.15) }));
+    state.t = 0; state.phi = 0;
+    canT.getContext('2d').clearRect(0,0,canT.width, canT.height);
+    state.neighbors = kNNIndices(state.positions, Math.min(K, Math.max(1,N-1)));
+    computeMasses();
+  }
+  randomize();
+
+  // -------- Physics -------- //
+  function step() {
+    const W = canM.width, H = canM.height;
+    const eps = SOFT * dpr;
+    const { positions, velocities, masses } = state;
+
+    if (((state.t*60)|0) % 10 === 0) {
+      state.neighbors = kNNIndices(positions, Math.min(K, Math.max(1,N-1)));
+      computeMasses();
+    }
+
+    const accX = new Float32Array(N); const accY = new Float32Array(N);
+    let phi = 0; const seen = new Set();
+    for (let i=0;i<N;i++){
+      const neigh = state.neighbors[i];
+      for (let z=0; z<neigh.length; z++){
+        const j = neigh[z]; if (j===i) continue;
+        const key = i<j ? (i+":"+j) : (j+":"+i); if (seen.has(key)) continue; seen.add(key);
+        const xi=positions[i], xj=positions[j];
+        const dx=xj.x - xi.x, dy=xj.y - xi.y; const r2 = dx*dx + dy*dy + eps*eps; const r = Math.sqrt(r2);
+        phi += -1 / r; const invr3 = 1/(r2*r);
+        // Acceleration on i due to j is ∝ m_j * (dx/r^3)
+        const m_i = masses[i], m_j = masses[j];
+        const fx = dx * invr3, fy = dy * invr3;
+        accX[i] += m_j * fx; accY[i] += m_j * fy;
+        accX[j] -= m_i * fx; accY[j] -= m_i * fy;
+      }
+    }
+
+    const h = DT * SPEED;
+    for (let i=0;i<N;i++){
+      if (mode === 'descent') {
+        velocities[i].x = accX[i] * h; velocities[i].y = accY[i] * h;
+      } else {
+        velocities[i].x = (1 - GAMMA*h) * velocities[i].x + accX[i]*h;
+        velocities[i].y = (1 - GAMMA*h) * velocities[i].y + accY[i]*h;
+      }
+      positions[i].x += velocities[i].x * h * 60;
+      positions[i].y += velocities[i].y * h * 60;
+      if (positions[i].x < 8) { positions[i].x = 8; velocities[i].x *= -0.7; }
+      if (positions[i].x > W-8) { positions[i].x = W-8; velocities[i].x *= -0.7; }
+      if (positions[i].y < 8) { positions[i].y = 8; velocities[i].y *= -0.7; }
+      if (positions[i].y > H-8) { positions[i].y = H-8; velocities[i].y *= -0.7; }
+    }
+
+    state.phi = phi; state.t += h;
+  }
+
+  // -------- Density/Potential Layer -------- //
+  const show = { edges: true, glow: false, density: true, massSize: true };
+  function drawDensity() {
+    if (!show.density) { const dctx = canD.getContext('2d'); dctx.clearRect(0,0,canD.width,canD.height); return; }
+    const dctx = canD.getContext('2d');
+    dctx.clearRect(0,0,canD.width,canD.height);
+    dctx.globalCompositeOperation = 'lighter';
+    dctx.filter = 'blur(10px)';
+    for (let i=0;i<N;i++){
+      const p = state.positions[i];
+      dctx.beginPath();
+      dctx.fillStyle = 'rgba(80,160,255,0.08)';
+      dctx.arc(p.x, p.y, 18*dpr, 0, TAU); dctx.fill();
+    }
+    dctx.filter = 'none';
+    dctx.globalCompositeOperation = 'source-over';
+
+    // Colorize via gradient map: draw a semi-transparent gradient over white density
+    const gctx = canD.getContext('2d');
+    const grad = gctx.createLinearGradient(0,0,canD.width,0);
+    grad.addColorStop(0.0,'rgba(14,165,233,0.35)'); // blue
+    grad.addColorStop(0.5,'rgba(34,197,94,0.35)');  // green
+    grad.addColorStop(1.0,'rgba(251,191,36,0.35)'); // amber
+    gctx.globalCompositeOperation = 'source-atop';
+    gctx.fillStyle = grad; gctx.fillRect(0,0,canD.width,canD.height);
+    gctx.globalCompositeOperation = 'source-over';
+  }
+
+  // -------- Rendering -------- //
+  function draw(){
+    drawDensity();
+    const ctx = canM.getContext('2d');
+    const tctx = canT.getContext('2d');
+    tctx.globalCompositeOperation = 'source-over';
+    tctx.fillStyle = 'rgba(0,0,0,0.07)';
+    tctx.fillRect(0,0,canT.width, canT.height);
+
+    ctx.clearRect(0,0,canM.width, canM.height);
+    const { positions } = state;
+
+    if (show.glow){
+      ctx.globalAlpha = 0.15;
+      for (let i=0;i<positions.length;i++){
+        const p = positions[i]; const r = 26 * dpr;
+        const g = ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,r);
+        g.addColorStop(0, '#18a34a'); g.addColorStop(1,'transparent');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x,p.y,r,0,TAU); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    if (show.edges){
+      ctx.globalAlpha = 0.45; ctx.lineWidth = 1.0 * dpr; ctx.strokeStyle = '#22d3ee';
+      const seen = new Set();
+      for (let i=0;i<N;i++){
+        const neigh = state.neighbors[i];
+        for (let z=0; z<neigh.length; z++){
+          const j = neigh[z]; const key = i<j ? (i+":"+j) : (j+":"+i); if (seen.has(key)) continue; seen.add(key);
+          const a = positions[i], b = positions[j];
+          ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+        }
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    for (let i=0;i<N;i++){
+      const p = positions[i]; const m = state.masses[i];
+      // Trail dot
+      tctx.beginPath(); tctx.fillStyle = 'rgba(59,130,246,0.9)'; tctx.arc(p.x,p.y,1.2*dpr,0,TAU); tctx.fill();
+      // Node core; scale by mass if enabled
+      const r = (show.massSize ? (1.5 + 1.2*m) : 2.0) * dpr;
+      ctx.beginPath(); ctx.fillStyle = '#fff'; ctx.arc(p.x,p.y,r,0,TAU); ctx.fill();
+    }
+
+    hud.textContent = `Φ: ${state.phi.toFixed(3)}, t: ${state.t.toFixed(2)}s, N: ${N}`;
+  }
+
+  // -------- Loop -------- //
+  function loop(){ if (running) step(); draw(); requestAnimationFrame(loop); }
+  requestAnimationFrame(loop);
+
+  // -------- UI Wiring -------- //
+  const $ = (id)=>document.getElementById(id);
+  function bindRange(id, out, fmt, on){ const el=$(id), o=$(out); const set=()=>{ o.textContent = fmt(parseFloat(el.value)); on(parseFloat(el.value)); }; el.addEventListener('input', set); set(); }
+
+  bindRange('iN','oN',v=>v,(v)=>{ N=v|0; randomize(); });
+  bindRange('iK','oK',v=>v,(v)=>{ K=v|0; state.neighbors = kNNIndices(state.positions, Math.min(K, Math.max(1,N-1))); computeMasses(); });
+  bindRange('iDt','oDt',v=>v.toFixed(3),(v)=>{ DT=v; });
+  bindRange('iG','oG',v=>v.toFixed(2),(v)=>{ GAMMA=v; });
+  bindRange('iS','oS',v=>v.toFixed(1),(v)=>{ SOFT=v; });
+  bindRange('iSpeed','oSpeed',v=>v.toFixed(2)+'×',(v)=>{ SPEED=v; });
+
+  $('play').addEventListener('click', ()=>{ running=!running; $('play').textContent = running ? '⏸ Pause' : '▶ Play'; });
+  $('reset').addEventListener('click', ()=> randomize());
+  $('modeU').addEventListener('click', ()=>{ mode='underdamped'; $('modeU').classList.add('primary'); $('modeD').classList.remove('primary'); });
+  $('modeD').addEventListener('click', ()=>{ mode='descent'; $('modeD').classList.add('primary'); $('modeU').classList.remove('primary'); });
+  $('tEdges').addEventListener('change', e=> show.edges = !!e.target.checked);
+  $('tField').addEventListener('change', e=> show.glow = !!e.target.checked);
+  $('tDensity').addEventListener('change', e=> show.density = !!e.target.checked);
+  $('tMassSize').addEventListener('change', e=> show.massSize = !!e.target.checked);
+  </script>
+</body>
+</html>
