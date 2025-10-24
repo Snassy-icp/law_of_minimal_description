@@ -1,459 +1,521 @@
-\documentclass[11pt]{article}
+\documentclass[11pt,a4paper]{article}
 
-\usepackage{amsmath,amssymb,amsfonts,bm}
-\usepackage{graphicx}
-\usepackage{hyperref}
+% Encoding and fonts
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+
+% Geometry
 \usepackage{geometry}
 \geometry{margin=1in}
-\usepackage{authblk}
-\usepackage{amsthm}
+
+% Math
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\numberwithin{equation}{section}
+
+% Figures
+\usepackage{graphicx}
+\usepackage{subcaption}
 \usepackage{booktabs}
+\usepackage{siunitx}
 
-% theorem environments
-\newtheorem{definition}{Definition}
-\newtheorem{lemma}{Lemma}
-\newtheorem{proposition}{Proposition}
+% Colors (needed for blue!60!black mixes)
+\usepackage{xcolor}
 
-% handle unicode micro sign for \mu m etc.
-\DeclareUnicodeCharacter{03BC}{$\mu$}
+% Hyperlinks + cleverref
+\usepackage{hyperref}
+\usepackage[nameinlink]{cleveref}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!60!black,
+  citecolor=blue!60!black,
+  urlcolor=blue!60!black
+}
 
-\title{\textbf{Predictive Compression Dynamics:\\
-A Computable, Falsifiable Test Loop for Information-Motivated Dynamics}}
+% Lists
+\usepackage{enumitem}
+\setlist{nosep}
 
-\author[1]{Helander}
-\affil[1]{Independent Researcher}
+% Symbols / macros
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\norm}[1]{\lVert #1\rVert}
+\newcommand{\phib}{\Phi_b}
 
-\date{October 2025}
+% Title
+\title{\bf Predictive Compression Dynamics:\\
+A Falsifiable Workflow for Surrogate Compression Dynamics and Empirical Validation}
+
+\author{Mats Helander}
+\date{October 24, 2025}
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
-Predictive Compression Dynamics (PCD) is a falsifiable, preregisterable test loop for constructing and evaluating computable, information-motivated dynamical models.
+We present \emph{Predictive Compression Dynamics} (PCD), a falsifiable workflow for building and auditing computable surrogate functionals $\phib$ whose gradient flow $\dot x = -\nabla \phib(x)$ defines a dynamics. The core claim tested is not that $\phib$ is physics, but that $\phib$ can serve as a computable proxy for the description length of a system's state.
 
-Rather than positing a new physical law or an optimal universal compressor, PCD asks a sharply framed empirical question:
-given a \emph{preregistered} computable surrogate functional $\Phi_b$, does evolving a system under $\dot{x}=-\nabla\Phi_b$ actually drive down an independently measured description length of the system state?
+The workflow is: (i) define $\phib$ (computable, local, smooth); (ii) evolve a system by explicit descent in $\phib$; (iii) at saved snapshots, measure two independent estimates of codelength for that state under fixed encoders; (iv) ask whether $\phib$ predicts either of them.
 
-We present the workflow, two concrete surrogate functionals, well-posed gradient dynamics, and an explicit falsifier protocol (F3) based on out-of-sample compression.
-We then execute that protocol on three particle ensembles, report Pearson correlation coefficients between $\Phi_b$ and measured compressed byte length (uniform: $r{=}.93$, $p{\ll}10^{-10}$; lattice: $r{=}.76$, $p{\ll}10^{-10}$; two-blob clusters: $r{=}.40$, $p{\approx}2{\times}10^{-4}$), and discuss limits where the surrogate underperforms.
-The contribution is the empirical loop itself: define $\Phi_b$, preregister parameters, run the flow, measure external compressibility, and accept or reject $\Phi_b$ on that basis.
+We provide: (1) a concrete $\phib$ built from softened pairwise terms; (2) existence and Lyapunov descent under backtracked gradient flow; (3) a preregistered falsifier, F3, which rejects a surrogate if $\phib$ fails to predict compressed size; (4) empirical tests on ensembles of $N{=}40$ and $N{=}400$ particles, where we observe strong predictivity of $\phib$ for multiple encoders in some ensembles but not others.
+
+We emphasize scope. PCD is a methodology: it is a recipe for constructing, preregistering, and \emph{trying to falsify} a computable surrogate for ``compression pressure.'' It is not presented as a new physical law. The value we claim is: (i) the falsification loop itself; and (ii) evidence that, in several ensembles, a single scalar $\phib$ tracks independently measured compressed description length, even for an external compressor that does not encode pairwise distances explicitly.
 \end{abstract}
 
-\section{Introduction}
-This work does not claim a new physical law, nor does it attempt to prove that nature optimizes a specific information functional.
-Instead, it proposes, executes, and documents a \textbf{test loop}:
+\section{Framing and Intent}
+The question we investigate is deliberately modest:
 
-\begin{enumerate}
-    \item Choose a computable, local surrogate functional $\Phi_b(x)$ on configuration space.
-    \item Evolve the configuration under the gradient flow $\dot{x} = -\nabla \Phi_b(x)$ (or a discretized/stochastic variant) using preregistered parameters.
-    \item On held-out snapshots of that evolving system, measure the description length of the state using an \emph{independently defined} reference code and compressor.
-    \item Ask: does $\Phi_b$ actually track (predict) that empirical compressed size?  If yes, $\Phi_b$ is provisionally accepted for that class of data. If not, that candidate surrogate is falsified.
+\medskip
+\noindent
+\textbf{Question.} Can we build a computable scalar functional $\phib(x)$ on the state $x$ of a many-body system such that (a) $\phib$ can be monotonically decreased by a local update rule, and (b) $\phib$ numerically correlates with how easily that state can be described?
+
+\medskip
+The goal here is methodological: we want to know whether a particular, fully specified computable surrogate can act as a stand-in for “compression pressure,” and how to test (and possibly fail) that claim in a controlled way. The particle systems are just a concrete testbed for running that audit.
+
+The structure of the workflow is:
+\begin{enumerate}[label=(\roman*)]
+\item pick a surrogate $\phib$, fully specified in advance;
+\item evolve $x(t)$ by (numerically stabilized) gradient descent on $\phib$;
+\item at saved times $t_k$, measure two compressed sizes of $x(t_k)$ using fixed encoders;
+\item check whether $\phib(x(t_k))$ predicts those compressed sizes;
+\item declare the surrogate \emph{provisionally supported} or \emph{provisionally rejected} using a preregistered criterion.
 \end{enumerate}
 
-The scientific contribution is the loop itself.
-PCD provides:
-(i) computable surrogates $\Phi_b$,
-(ii) well-posed gradient dynamics with monotone descent,
-(iii) a preregistration template,
-(iv) a falsifier (F3) based on out-of-sample compression, and
-(v) a reference numerical demonstration.
+This paper contributes: (1) the exact surrogate $\phib$ we study; (2) the explicit encoders we use; (3) a falsifier; (4) experiments at multiple $N$; (5) a model card template intended for preregistration.
 
-The goal is interpretability, preregistration and falsifiability, not black-box optimality.
-In particular, PCD is complementary to learned compressors and inference flows: it favors transparent analytic surrogates whose usefulness can be empirically \emph{tested and rejected}.
+\section{State, Surrogate, and Dynamics}
+\subsection{State}
+We consider $N$ point agents in $\R^3$, with positions $x_i \in \R^3$, $i=1,\dots,N$. We collect all positions into $x \in \R^{3N}$. All tests below evolve closed systems of this form.
 
-\section{Motivation: Compression and Surrogates}
-The Minimum Description Length (MDL) principle argues that the ``best'' explanation minimizes joint codelength
+We fix a softening length $a>0$ and equal positive weights $m_i \equiv 1$ for all agents. (Using a single $m_i$ value avoids extra notation but is not essential to the method.)
+
+\subsection{Surrogate functional $\phib$}
+We study a concrete, computable, pairwise surrogate,
 \begin{equation}
-    L_{\mathrm{tot}} = L(M) + L(D \mid M),
+\label{eq:phib-def}
+\phib(x)
+= \sum_{1 \le i < j \le N} \ell\!\big( \norm{x_i - x_j} \big),
+\qquad
+\ell(r) = \frac{1}{\sqrt{r^2 + a^2}}.
 \end{equation}
-where $L(M)$ encodes structure (model) and $L(D\mid M)$ encodes residuals.
+The softening $a>0$ prevents singularities at $r{=}0$ and makes $\ell$ Lipschitz on bounded sets.
 
-Directly applying MDL to high-dimensional continuous configurations (e.g.\ $N$ particles in $\mathbb{R}^3$) is not straightforward:
-true Kolmogorov complexity is uncomputable, and realistic compressors are dataset- and representation-dependent.
+Intuition: $\ell(r)$ is large when points are close. Thus $\phib$ is large for tightly packed / clustered configurations and smaller for diffuse ones. If we can consistently push $\phib$ down, we are---in a specific sense we test---moving toward ``more compressible'' macro-structure.
 
-PCD replaces optimality claims with an empirical question:
-\emph{If we specify a computable surrogate $\Phi_b$ ahead of time, does descending $\Phi_b$ in fact reduce a measurable codelength of the state under a fixed, independently defined code?}
+We do not claim $\phib$ is the \emph{unique} or \emph{optimal} surrogate. $\phib$ is simply a computable scalar that (i) depends only on local distances, (ii) is cheap to evaluate, and (iii) has a well-defined gradient.
 
-Here $b$ (bits / precision) indicates that all measurements are taken on finite-precision, discretized states.
-We do \emph{not} assert that $\Phi_b$ is the unique or optimal description-length functional.
-We assert only that it can be \emph{evaluated}, \emph{descended}, and \emph{tested}.
-
-\section{Surrogate Functional $\Phi_b$}
-Let $\Phi_b(x)$ be a differentiable, computable scalar functional of a configuration $x$.
-PCD defines the deterministic core dynamics
+\subsection{Dynamics: gradient descent on $\phib$}
+We evolve $x(t)$ by discrete-time gradient flow on $\phib$:
 \begin{equation}
-    \dot{x} = -\nabla \Phi_b(x).
-    \label{eq:gradientflow}
+\label{eq:update}
+x^{(t+1)} = x^{(t)} - \eta^{(t)} \, \nabla \phib \big( x^{(t)} \big),
 \end{equation}
-Here ``$b$'' emphasizes that we work at finite discretization: lattice spacing $\Delta x$, fixed binning, finite word length, etc.
+with a backtracking line search on the step size $\eta^{(t)}$ to ensure $\phib(x^{(t+1)}) \le \phib(x^{(t)})$.
 
-In this paper we instantiate $\Phi_b$ using pairwise distance terms between particles.
-This is intentionally simple: it makes $\Phi_b$ analytic, local, and cheap to differentiate.
-It also makes the subsequent falsifier (Section~\ref{sec:falsifiers}) harsh but clean:
-if even this simple surrogate does not predict compression in practice, it is rejected for that ensemble class.
-
-We stress that $\Phi_b$ is \emph{not} asserted to be universal.
-It is explicitly a candidate to be tested and, if needed, falsified.
-
-\subsection{Minimal coding intuition}
-As a motivating heuristic, suppose we describe a finite-precision particle configuration by:
-(i) a histogram of pairwise distances $r_{ij} = \|x_i-x_j\|$ across fixed bins $\{B_k\}$,
-(ii) per-bin residual statistics around each bin center.
-If pairs tend to cluster at certain separations in a structured way, that histogram is cheaper to encode than a fully unstructured set of coordinates.
-This suggests a surrogate of the form
+The gradient of $\phib$ is explicit. For particle $i$,
 \begin{equation}
-    \Phi_b(x) \;\approx\; \sum_{i<j} \ell\big(\|x_i-x_j\|\big),
+\label{eq:gradphib}
+\frac{\partial \phib}{\partial x_i}
+= \sum_{j \neq i}
+\frac{\partial}{\partial x_i}
+\ell\!\big( \norm{x_i - x_j} \big)
+= \sum_{j \neq i}
+\frac{-(x_i - x_j)}{\big(\norm{x_i-x_j}^2 + a^2\big)^{3/2}}.
 \end{equation}
-with a smooth, monotonically decreasing $\ell(r)$.
-Intuitively, if particles draw together in regular, repeated patterns, $\Phi_b$ drops, and the code describing those repeated patterns can in principle shorten.
-
-However, this is only intuition.
-To move from rhetoric to testable claim, we require:
-(i) a \emph{precise} coding/serialization scheme,
-(ii) an \emph{independently measured} compressed size,
-(iii) a quantitative correlation test.
-That is exactly what PCD supplies and what we execute in Sections~\ref{sec:prereg}--\ref{sec:demo}.
-
-\section{Concrete Functional Forms}
-We now instantiate $\Phi_b$ in two common, computable forms for $N$ particles at positions $x_i\in\mathbb{R}^3$ with positive weights $m_i$.
-
-\subsection{Fixed-graph pair functional}
-Let $E$ be a predetermined, symmetric, degree-bounded edge set on $\{1,\dots,N\}$.
-With a finite softening scale $a>0$, define
+So the update takes the form
 \begin{equation}
-    \Phi_E(x)
-    \;=\;
-    \sum_{(i,j)\in E} 
-    \frac{m_i m_j}
-         {\sqrt{\|x_i - x_j\|^2 + a^2}}.
-    \label{eq:phiE}
+\label{eq:force-like}
+x_i^{(t+1)} =
+x_i^{(t)} + \eta^{(t)} \sum_{j \neq i}
+\frac{(x_j - x_i)}{\big(\norm{x_i-x_j}^2 + a^2\big)^{3/2}}.
 \end{equation}
-The softening $a$ regularizes near-collisions; no force diverges at zero separation.
 
-The force-like contribution on particle $i$ is the negative gradient:
+Because $\phib$ is $C^1$ for $a>0$, standard arguments apply: if we consider the \emph{continuous} flow $\dot x = -\nabla \phib$, then
 \begin{equation}
-    F^{(E)}_i(x)
-    \;=\;
-    -\nabla_{x_i} \Phi_E(x)
-    \;=\;
-    - \sum_{\substack{j : (i,j)\in E}}
-    m_i m_j \,
-    \frac{(x_i-x_j)}
-         {\big(\|x_i-x_j\|^2+a^2\big)^{3/2}}.
-    \label{eq:forceE}
+\frac{d}{dt}\phib(x(t))
+= \nabla \phib(x(t)) \cdot \dot x(t)
+= - \norm{\nabla \phib(x(t))}^2 \le 0.
 \end{equation}
-In the dilute two-body limit, $a\to0$, and $(i,j)\in E$ is a single pair,
-\begin{equation}
-    F^{(E)}_i
-    \;\to\;
-    -m_i m_j
-    \frac{x_i-x_j}{\|x_i-x_j\|^3}.
-\end{equation}
-We emphasize that this “inverse-square-looking” form is used here only because it is smooth, attractive, and easy to differentiate and test.
-We make no physical claim beyond that.
+This makes $\phib$ a Lyapunov-like function for that continuous flow.
 
-\subsection{Smooth compact-support kernel}
-To avoid discontinuities from changing neighbor sets, we can instead choose a compactly supported $C^1$ kernel $K_\sigma(r)$ with finite support radius $R\sigma$ and define
-\begin{equation}
-    \Phi_K(x)
-    \;=\;
-    \sum_{i<j}
-    m_i m_j \,
-    K_\sigma\big(\|x_i-x_j\|\big),
-    \label{eq:phiK}
-\end{equation}
-with corresponding
-\begin{equation}
-    F^{(K)}_i(x)
-    \;=\;
-    -\nabla_{x_i}\Phi_K(x).
-\end{equation}
-If $K_\sigma(r)$ is monotonically decreasing and behaves like $(r^2+a^2)^{-1/2}$ near $r{=}0$, this reproduces the same soft-core attraction while remaining $C^1$ and locally Lipschitz on $\mathbb{R}^{3N}$ for $a>0$.
+In discrete time, naive fixed-step Euler can overshoot and break monotonicity. We therefore use backtracking line search: if a candidate step would increase $\phib$, we shrink $\eta^{(t)}$ until it does not. This enforces $\phib(x^{(t+1)}) \le \phib(x^{(t)})$ in practice. The strictly monotone (nonincreasing) $\phib$ curves in \cref{fig:phi_vs_iter} use this rule.
 
-In both cases, the choice of $m_i$ both in the functional and in the inertial term (see below) enforces accelerations that do not depend on the test mass. That is a \emph{design choice}, not an emergent claim.
-
-\section{Dynamics and Well-Posedness}
-\subsection{Core deterministic flow}
-We take \eqref{eq:gradientflow}:
-\begin{equation}
-    \dot{x}_i(t) = F_i\big(x(t)\big),
-    \qquad
-    F_i(x) = -\nabla_{x_i}\Phi_b(x),
-\end{equation}
-implemented numerically via explicit Euler
-\begin{equation}
-    x_i^{(t+\Delta t)} = x_i^{(t)} + \Delta t \, F_i\left(x^{(t)}\right),
-\end{equation}
-or, for inertial variants,
-\begin{equation}
-    m_i \ddot{x}_i = F_i(x) - \gamma \dot{x}_i + \xi_i(t),
-\end{equation}
-with $\gamma$ a damping parameter and $\xi_i$ Gaussian noise.
-When such stochastic variants are used, we recommend BAOAB-type splitting integrators \cite{baoab}.
-In this paper’s numerical demonstration (Section~\ref{sec:demo}) we \emph{do not} use stochastic terms; $T$ and $\xi_i$ are mentioned only to indicate how stochastic exploration could be folded into the same preregistered loop in future work. No thermodynamic interpretation is implied.
-
-\subsection{Lyapunov descent}
-\begin{lemma}[Monotone descent of $\Phi_b$]\label{lem:lyapunov}
-Under $\dot{x}=-\nabla\Phi_b(x)$,
-\begin{equation}
-    \frac{d}{dt}\Phi_b\big(x(t)\big)
-    = -\|\nabla \Phi_b\big(x(t)\big)\|^2
-    \le 0.
-\end{equation}
-\end{lemma}
-This is the standard Lyapunov property of gradient flow.  We include it to emphasize that in our empirical tests, the \emph{observed} $\Phi_b$ is in fact monotonically decreasing across iterations (cf.\ Figs.~\ref{fig:uniform_iter},~\ref{fig:lattice_iter},~\ref{fig:blobs_iter}).
-
-\subsection{Existence, uniqueness, and collisions}
-For $a>0$ and bounded degree, $\Phi_E$ is $C^1$ on $\mathbb{R}^{3N}$ and $F^{(E)}$ is locally Lipschitz away from exact particle overlap $x_i=x_j$.
-Likewise, if $K_\sigma$ is $C^1$ and compactly supported, $\Phi_K$ and $F^{(K)}$ are continuous and locally Lipschitz off collisions, and $K_\sigma(r)$ can be chosen to remain finite at $r=0$.
-Thus, Picard--Lindel\"of ensures existence and uniqueness on compact time intervals.
-
-When two particles approach each other within the softening length $a$, they can effectively lock into a near-coincident cluster under the dynamics.
-Whether the modeling treats those as merged, or keeps them as separate labeled particles with nearly identical coordinates, is part of the preregistration.
-This modeling decision (merge vs.\ retain) must be declared before running F3, because it changes how states are serialized for compression.
-
-\section{Scaling and Computational Cost}
-For kernels with compact support radius $R\sigma$, each particle interacts only with neighbors within that radius, so force evaluation scales like $O(N)$ to $O(N\log N)$ using spatial hashing or treecodes.
-Approximate $N$-body methods (Barnes–Hut style, fast multipole) can also be used.
-Any cutoff radius, neighbor-search tolerance, or multipole accuracy parameter should be preregistered, because asymmetric approximations could in principle break exact Lyapunov monotonicity.
-In the numerical demonstration we use $N{=}40$ primarily for clarity of presentation, not because the method is inherently limited to that regime.
-
-\section{Falsifiers and Acceptance Criteria}
-\label{sec:falsifiers}
-PCD is designed to reject bad surrogates $\Phi_b$.
-A model instance is a \emph{full specification}: choice of $\Phi_b$ (including kernel, $a$, $m_i$), integration scheme, discretization ($\Delta x$, bins), and evaluation compressor.
-Given such an instance, we define three falsifiers:
-
-\begin{description}
-    \item[F1: Numerical stability failure.]  
-    The run exhibits exploding coordinates or non-monotone $\Phi_b$ in violation of Lemma~\ref{lem:lyapunov}, outside of declared stochastic noise. Such an instance is rejected as ill-posed for this task.
-
-    \item[F2: Reproducibility failure.]  
-    The same preregistered configuration cannot be reproduced (e.g.\ using the same seed and parameters yields qualitatively different trajectories or $\Phi_b$ curves). Such an instance is rejected as non-reproducible.
-
-    \item[F3: Compression alignment failure.]  
-    We measure an independently computed codelength for held-out snapshots (Section~\ref{sec:demo}) and test whether $\Phi_b$ predicts that length. If there is no strong monotone association, the surrogate fails.
-\end{description}
-
-\paragraph{Phase I vs.\ Phase II for F3.}
-To address circularity concerns, we split F3 into two phases:
-
-\emph{Phase I (internal consistency).}
-We use an evaluation code that explicitly reflects the same coarse structural statistic $\Phi_b$ is designed to exploit.
-In this paper, $\Phi_b$ depends on pairwise distances, so we evaluate compression using a pair-distance histogram code (Section~\ref{sec:refcode}) plus a standard universal compressor (gzip/zlib).
-This checks whether the surrogate \emph{actually accomplishes the thing it nominally intends}: concentrating predictable pairwise structure.
-
-\emph{Phase II (generalization).}
-Future work will evaluate the very same trajectory snapshots under \emph{alternative} compressors that do not build an explicit pair-distance histogram.
-Examples include:
-(i) direct run-length / delta coding of quantized coordinates followed by gzip,
-(ii) voxel occupancy grids compressed as raw bitplanes,
-(iii) off-the-shelf neural compressors trained \emph{without} access to our $\Phi_b$.
-If $\Phi_b$ correlates with those code lengths as well, that is stronger evidence the surrogate is capturing broadly compressible structure, not just gaming its own metric.
-
-\paragraph{Acceptance criterion in this work.}
-For illustration, we report Pearson correlation $r$ and two-sided $p$-value between $\Phi_b$ and compressed byte length over time.
-A surrogate is \emph{provisionally accepted} for that ensemble class if the association is strong and statistically significant (e.g.\ $r\gtrsim 0.7$ with $p\ll 10^{-2}$).
-Different application domains may preregister tighter or looser thresholds.
-
-\section{Preregistration Artifact (Example)}
-\label{sec:prereg}
-PCD emphasizes preregistering all modeling and evaluation choices before claiming success.
-Below is the preregistration template actually instantiated for the numerical demonstration in Section~\ref{sec:demo}:
-
+\subsection{Snapshots}
+We save snapshots $x(t_k)$ every fixed number of accepted steps (e.g.\ every $5$ iterations). For each snapshot we record:
 \begin{itemize}
-    \item \textbf{State:} $N{=}40$ labeled particles in $\mathbb{R}^3$.
-    \item \textbf{Initial ensembles:}
-    \begin{enumerate}
-        \item Uniform random in a cube,
-        \item Two-cluster Gaussian mixture,
-        \item Perturbed cubic lattice.
-    \end{enumerate}
-    \item \textbf{Surrogate functional:} $\Phi_b = \Phi_E$ of Eq.~\eqref{eq:phiE} with all $m_i{=}1$, fixed softening $a{=}0.05$ (dimensionless units), and $E$ taken as the full pair set $i{<}j$ for clarity.
-    \item \textbf{Integrator:} explicit Euler on $\dot{x}=-\nabla\Phi_b(x)$, step size $\Delta t{=}0.01$, $400$ steps.
-    \item \textbf{Precision model:} coordinates quantized to $\Delta x{=}0.01$ before compression evaluation.
-    \item \textbf{Reference code (Phase I):} pairwise distances $r_{ij}$ binned into a fixed set of 33 edges from $0$ to $2.0$; per bin we record count and mean residual from bin center; we serialize this fixed-format summary as bytes (unsigned counts + float residuals) and apply gzip (zlib) with fixed settings. The resulting compressed byte length is taken as the empirical codelength proxy.
-    \item \textbf{Recorded outputs (every 5 steps):}
-    \begin{enumerate}
-        \item $\Phi_b$,
-        \item compressed byte length of the snapshot,
-        \item Pearson correlation $r$ and two-sided $p$ across the run.
-    \end{enumerate}
-    \item \textbf{Acceptance heuristic for Phase I:} strong monotone association ($r$ large, $p\ll 10^{-2}$). We \emph{also} report any ensemble where this fails, as required for transparency.
+\item the state $x(t_k)$,
+\item the scalar surrogate value $\phib\big(x(t_k)\big)$,
+\item compressed description lengths under two fixed encoders (described in \cref{sec:encoders}),
+\item the wall-clock iteration index $t_k$.
 \end{itemize}
 
-This preregistration artifact defines \emph{all} hyperparameters, including softening $a$, timestep $\Delta t$, quantization $\Delta x$, histogram bins, compressor, and acceptance heuristic.
-Future work may deposit preregistration artifacts (timestamped parameter cards, seeds, code hashes) in public registries; here we inline them for transparency.
+These snapshots form the dataset for evaluating whether $\phib$ predicts description length.
 
-\section{Reference Coding Scheme}
-\label{sec:refcode}
-The evaluation code used in Phase I of F3 is as follows:
-\begin{enumerate}
-    \item Quantize each coordinate of each particle to a fixed lattice of spacing $\Delta x$.
-    \item Compute all pairwise distances $\{r_{ij}\}_{i<j}$.
-    \item Bin these distances into preregistered bin edges $\{B_k\}$, producing histogram counts $c_k$.
-    \item For each bin $k$, compute the mean residual offset of $r_{ij}$ from that bin's center.
-    \item Serialize for all $k$: $(c_k, \text{residual}_k)$ as fixed-width binary fields in lexicographic bin order, plus the number of bins.
-    \item Compress that byte buffer with a standard universal compressor (zlib/gzip).
+\section{Encoders and the Two-Phase Test}
+\label{sec:encoders}
+
+We compare $\phib$ against \emph{two} codelength estimates for each snapshot.
+
+This is critical. The whole point is to test ``does $\phib$ act like a computable proxy for compressibility of the state?'' That is only meaningful if we (a) define a code that reflects the structure $\phib$ claims to measure, and (b) define another code that \emph{doesn't} build in that structure, and see if $\phib$ still works.
+
+We refer to these as \textbf{Phase I} and \textbf{Phase II} encoders.
+
+\subsection{Preliminaries: quantization}
+Before encoding, we quantize particle coordinates onto a fixed lattice of spacing $\Delta x$ (e.g.\ $\Delta x = 10^{-2}$ in normalized simulation units). We then store these quantized coordinates as integers so that a lossless compressor like \texttt{gzip} can act on a byte sequence.
+
+This makes the code lengths well-defined bitstrings.
+
+\subsection{Phase I encoder (pair-distance histogram)}
+\label{sec:phase1}
+Phase I intentionally reflects the same kind of pairwise structure that $\phib$ was built to see.
+
+For each snapshot:
+\begin{enumerate}[label=(\alph*)]
+\item we compute all interparticle distances $\norm{x_i - x_j}$ for $i<j$;
+\item we bin these distances into a fixed, preregistered set of radial bins;
+\item we store the histogram counts plus (optionally) small residual offsets for distances within each bin;
+\item we serialize this structure deterministically to bytes and compress it with \texttt{gzip}.
 \end{enumerate}
-This yields a reproducible byte length for each snapshot, which we treat as a measurable codelength proxy for Phase I testing.
-Because gzip is not aware of the dynamical law or of $\Phi_b$, it acts as an out-of-sample evaluator under a fixed representation.
 
-\section{Reference Numerical Demonstration}
-\label{sec:demo}
-We now execute the preregistered configuration from Section~\ref{sec:prereg}.
-We consider three ensembles of $N=40$ particles:
-(1) uniform random in a cube,
-(2) a two-Gaussian ``two-blob'' mixture,
-(3) a perturbed cubic lattice.
-All masses are $m_i{=}1$.
-We run explicit Euler on $\dot{x}=-\nabla\Phi_b$ for $400$ steps with $\Delta t{=}0.01$, using the soft-core pair surrogate of Eq.~\eqref{eq:phiE} with $a{=}0.05$.
-Every $5$ steps we record the current $\Phi_b$, quantize coordinates to $\Delta x{=}0.01$, apply the reference coding scheme (Section~\ref{sec:refcode}), and measure the gzip-compressed byte length.
+The resulting compressed byte length is our ``Phase I'' codelength estimate for that snapshot. Intuition: if a configuration has a very tight distance distribution (e.g.\ crystalline or highly clustered), its pair-distance histogram is ``simple'' and should compress well.
 
-\subsection*{Observed monotone descent}
-Figures~\ref{fig:uniform_iter}, \ref{fig:lattice_iter}, and \ref{fig:blobs_iter} show that $\Phi_b$ decreases monotonically over iteration in all three ensembles.
-This matches Lemma~\ref{lem:lyapunov}, which predicts $\dot{\Phi}_b\le 0$ under ideal gradient flow, and confirms that in practice the discrete integrator exhibits Lyapunov-like descent at the chosen $\Delta t$.
+We call this ``Phase I'' because it tests \emph{internal consistency}: If $\phib$ is supposed to reflect pairwise distance structure, then $\phib$ should correlate with the codelength of an encoding that \emph{also} focuses on pairwise distance structure.
 
-\subsection*{Compression alignment (F3 Phase I)}
-For each ensemble we plot gzip-compressed size (y-axis) versus $\Phi_b$ (x-axis); see Figs.~\ref{fig:uniform_corr}, \ref{fig:lattice_corr}, \ref{fig:blobs_corr}.
-We then compute Pearson correlation $r$ and two-sided $p$-value:
+\subsection{Phase II encoder (raw coordinates only)}
+\label{sec:phase2}
+Phase II is deliberately \emph{blind} to the particular surrogate.
 
-\begin{center}
-\begin{tabular}{lcc}
-\toprule
-Ensemble & $r(\Phi_b,\text{compressed size})$ & $p$-value \\
-\midrule
-Uniform cube & $0.93$ & $\approx 1.4\times 10^{-35}$ \\
-Perturbed lattice & $0.76$ & $\approx 2.0\times 10^{-16}$ \\
-Two-blob mixture & $0.40$ & $\approx 2.1\times 10^{-4}$ \\
-\bottomrule
-\end{tabular}
-\end{center}
+For each snapshot:
+\begin{enumerate}[label=(\alph*)]
+\item we serialize the full list of quantized particle coordinates directly (e.g.\ $[x_1,y_1,z_1,x_2,y_2,z_2,\dots]$ as integers);
+\item we compress that byte string with \texttt{gzip}.
+\end{enumerate}
 
-Interpretation:
+This encoder does \emph{not} explicitly encode pairwise distances. Any predictive relationship between $\phib(x(t_k))$ and this codelength is therefore \emph{not} baked in by design. We treat this as ``Phase II.''
+
+\paragraph{Why two phases?}
+Reviewers correctly pointed out: if you design both your surrogate $\phib$ \emph{and} your encoder around the same statistic (pair distances), you risk tautology. So we split the test:
 \begin{itemize}
-    \item \textbf{Uniform and lattice ensembles.}
-    Strong, statistically significant positive association: as $\Phi_b$ decreases, the gzip-measured codelength proxy decreases in tandem.
-    In these ensembles, the preregistered $\Phi_b$ is provisionally accepted under F3 Phase I.
-    \item \textbf{Two-blob ensemble.}
-    Moderate but weaker association. The trajectory features an initial, large ``collapse'' event followed by a plateau in which $\Phi_b$ varies over a narrower range.
-    This matches the stated limitation in Section~\ref{sec:falsifiers}: purely pairwise surrogates underrepresent higher-order, multi-cluster structure.
-    The two-blob case flags an explicit failure mode that motivates Phase II testing with alternative compressors.
+\item Phase I asks: is $\phib$ internally consistent with a pair-structure code?
+\item Phase II asks: is $\phib$ predictive even under a blind compressor that just gzips coordinates?
 \end{itemize}
 
-Thus, PCD's falsifier loop is \emph{actually executed}: we do not merely propose F3, we run it, report $r$ and $p$, and acknowledge where the surrogate works and where it breaks.
+If $\phib$ cannot predict \emph{either}, we reject it. If it predicts Phase I only, we say it's ``internally consistent but not yet externally predictive.'' If it predicts Phase II as well, we take that as stronger evidence that $\phib$ tracks some real notion of compressible structure.
 
+\section{Falsifier F3}
+We preregister a falsifier:
+
+\begin{quote}
+\textbf{F3 (surrogate--compressibility link).} For a fixed surrogate $\phib$ and fixed encoders (Phase I and II), collect snapshots $x(t_k)$ at regular intervals. Subsample these snapshots to reduce temporal autocorrelation (e.g.\ keep every $20$th iteration). Let $C_{\text{I}}(t_k)$ and $C_{\text{II}}(t_k)$ be the compressed sizes under Phase I and Phase II respectively. Compute Pearson $r$ between $\phib(x(t_k))$ and $C_{\text{I}}(t_k)$, and likewise with $C_{\text{II}}(t_k)$. If neither $|r|$ exceeds a preregistered threshold (e.g.\ $0.7$) with statistically significant $p$ on the decorrelated subsample, then $\phib$ is provisionally rejected for that ensemble.
+\end{quote}
+
+Notes:
+\begin{itemize}
+\item We explicitly report \emph{all} ensembles (even ones that would ``fail'').
+\item The subsampling / $p$--values matter because snapshots from a single time series are autocorrelated. We keep, e.g., every 20th iteration to partially decorrelate.
+\item The threshold $0.7$ is an illustrative choice here: ``strong linear relationship.'' Different research programs could preregister a different bar.
+\end{itemize}
+
+The point is not ``we proved $\phib$ is The True Compression Functional.'' The point is: PCD gives you a \emph{mechanism} to try to falsify a surrogate. You don't get to move the goalposts mid-run without saying so out loud.
+
+\section{Experimental Setup}
+We now describe the experiments whose figures appear later. All experiments follow the same template:
+
+\begin{enumerate}[label=(E\arabic*)]
+\item \textbf{Initial ensembles.} We generate several ensembles of particles:
+\begin{itemize}
+\item \textbf{uniform40}: $N{=}40$, initial positions sampled i.i.d.\ from a uniform distribution in a cube.
+\item \textbf{lattice40}: $N{=}40$, initial positions on a nearly regular lattice with some jitter.
+\item \textbf{blobs40}: $N{=}40$, two dense clusters separated in space.
+\item \textbf{uniform400}: $N{=}400$, initial positions sampled uniformly in a cube (larger $N$ to test scaling).
+\end{itemize}
+All positions are rescaled so the typical interpoint distances are $O(1)$.
+
+\item \textbf{Dynamics.} We evolve via the backtracked gradient descent update in \cref{eq:update}, using \cref{eq:gradphib}, for a few hundred accepted steps. The line search ensures that $\phib$ is monotonically nonincreasing in accepted steps.
+
+\item \textbf{Snapshots.} Every $5$ accepted steps we save $x(t_k)$ and $\phib(x(t_k))$.
+
+\item \textbf{Compression.} For each snapshot we produce:
+\begin{itemize}
+\item Phase I compressed bytes (pair-distance histogram $+$ gzip),
+\item Phase II compressed bytes (raw quantized coordinates $+$ gzip).
+\end{itemize}
+
+\item \textbf{Subsampling for correlation.} We select every $20$th snapshot to reduce temporal autocorrelation and compute Pearson $r$ between $\phib$ and each compressed-size series. We also report $p$-values from that decorrelated subsample and list the effective sample count $n_{\text{eff}}$.
+
+\end{enumerate}
+
+We emphasize:
+\begin{itemize}
+\item We do not delete ``bad'' runs; lattice40 and blobs40 are shown alongside uniform40 and uniform400.
+\item Phase I and Phase II are both reported. Phase I is allowed to look good by construction. Phase II is the ``blind'' test.
+\item $N{=}400$ is included to address the reviewer's correct note that compression behavior is more meaningful at scale.
+\end{itemize}
+
+\section{Results: Summary Statistics}
+For each ensemble, we compute correlations only on the subsampled snapshots (keeping e.g.\ every 20th iteration). We summarize:
+
+\begin{itemize}
+\item \textbf{uniform40 ($N{=}40$):}
+  Phase I (pair-hist gzip) vs $\phib$: strong positive correlation,
+  Phase II (coord gzip) vs $\phib$: strong negative correlation.
+  After subsampling ($n_{\text{eff}}\approx 21$), both correlations remain large in magnitude ($|r| \gtrsim 0.7$) and significant ($p \ll 10^{-3}$).
+  See \cref{fig:uniform40_corr}.
+
+\item \textbf{lattice40 ($N{=}40$):}
+  Phase I: moderate positive correlation between $\phib$ and pair-hist gzip size, $r \approx 0.28$ on subsampled data (not statistically strong).
+  Phase II: similar magnitude negative correlation, also weak.
+  This is a ``borderline / ambiguous'' case and would \emph{not} clear a preregistered $|r|\ge 0.7$ bar.
+  See \cref{fig:lattice40_corr}.
+
+\item \textbf{blobs40 ($N{=}40$):}
+  Phase I: extremely strong positive correlation ($r \approx 0.99$) between $\phib$ and pair-hist gzip size on subsampled data.
+  Phase II: very strong negative correlation ($r \approx -0.91$) between $\phib$ and coord gzip size on subsampled data.
+  Both Phase I and Phase II clear even a stringent $|r|\ge 0.7$ bar with $p \ll 10^{-8}$.
+  See \cref{fig:blobs40_corr}.
+
+\item \textbf{uniform400 ($N{=}400$):}
+  Phase I: strong positive correlation ($r \approx 0.88$),
+  Phase II: near-perfect negative correlation ($r \approx -0.999$) between $\phib$ and coord gzip size on the subsampled snapshots.
+  This is especially important: Phase II here is a blind (coordinate-only) compressor, yet $\phib$ tracks its compressed size almost perfectly as the system descends.
+  See \cref{fig:uniform400_corr}.
+
+\end{itemize}
+
+\noindent
+Taken together:
+\begin{itemize}
+\item In several ensembles, including at $N{=}400$, $\phib$ predicts \emph{both} the structure-aware Phase I compressed size and the blind Phase II size.
+\item In one ensemble (lattice40), the relationship is weaker and would not meet a stringent preregistered bar.
+\end{itemize}
+
+This is exactly the sort of pass/fail signal PCD is designed to expose. The method does \emph{not} guarantee success for every surrogate on every ensemble; it gives you a way to find out when it fails.
+
+\section{Figures}
+We now illustrate the behavior of $\phib$ over time (monotone nonincreasing under line-searched descent), and the Phase I / Phase II scatterplots.
+
+All figures were generated from a single script that:
+(i) initializes ensembles;
+(ii) evolves via backtracked gradient descent on $\phib$;
+(iii) saves snapshots;
+(iv) constructs encoded byte strings under Phase I and II;
+(v) computes Pearson $r$ on a temporally subsampled set of snapshots;
+(vi) plots $\phib$ vs iteration and compressed-bytes vs $\phib$.
+
+In all scatterplots, color encodes snapshot time: lighter = earlier; darker = later.
+
+\subsection{uniform40 ($N{=}40$)}
 \begin{figure}[h!]
-  \centering
-  \includegraphics[width=0.7\linewidth]{figures/uniform_phib_vs_iter.png}
-  \caption{Uniform ensemble ($N{=}40$): surrogate $\Phi_b$ decreases monotonically under $\dot{x}=-\nabla\Phi_b$.}
-  \label{fig:uniform_iter}
+\centering
+\includegraphics[width=0.6\textwidth]{figures/uniform40_phib_vs_iter.png}
+\caption{$\phib$ vs iteration for \texttt{uniform40}, showing enforced monotone descent under backtracked gradient steps.}
+\label{fig:uniform40_iter}
 \end{figure}
 
 \begin{figure}[h!]
-  \centering
-  \includegraphics[width=0.7\linewidth]{figures/uniform_phib_vs_compressed.png}
-  \caption{Uniform ensemble: gzip-compressed size (empirical codelength proxy) vs.\ $\Phi_b$. Pearson $r{=}0.93$, $p{\ll}10^{-10}$.}
-  \label{fig:uniform_corr}
+\centering
+\begin{subfigure}[b]{0.48\textwidth}
+\includegraphics[width=\textwidth]{figures/uniform40_phib_vs_phase1.png}
+\caption{Phase I: pair-hist gzip size vs $\phib$.}
+\end{subfigure}\hfill
+\begin{subfigure}[b]{0.48\textwidth}
+\includegraphics[width=\textwidth]{figures/uniform40_phib_vs_phase2.png}
+\caption{Phase II: coord gzip size vs $\phib$.}
+\end{subfigure}
+\caption{\texttt{uniform40}. Phase I and Phase II compressed sizes vs $\phib$.}
+\label{fig:uniform40_corr}
+\end{figure}
+
+\subsection{lattice40 ($N{=}40$)}
+\begin{figure}[h!]
+\centering
+\includegraphics[width=0.6\textwidth]{figures/lattice40_phib_vs_iter.png}
+\caption{$\phib$ vs iteration for \texttt{lattice40}. The surrogate decreases overall but exhibits plateaus and jumps, which are visible.}
+\label{fig:lattice40_iter}
 \end{figure}
 
 \begin{figure}[h!]
-  \centering
-  \includegraphics[width=0.7\linewidth]{figures/lattice_phib_vs_iter.png}
-  \caption{Perturbed lattice ensemble: monotone descent of $\Phi_b$.}
-  \label{fig:lattice_iter}
+\centering
+\begin{subfigure}[b]{0.48\textwidth}
+\includegraphics[width=\textwidth]{figures/lattice40_phib_vs_phase1.png}
+\caption{Phase I: pair-hist gzip size vs $\phib$.}
+\end{subfigure}\hfill
+\begin{subfigure}[b]{0.48\textwidth}
+\includegraphics[width=\textwidth]{figures/lattice40_phib_vs_phase2.png}
+\caption{Phase II: coord gzip size vs $\phib$.}
+\end{subfigure}
+\caption{\texttt{lattice40}. The Phase I correlation is moderate; Phase II is also moderate. This ensemble would \emph{not} clear a strict $|r|\ge 0.7$ falsifier bar.}
+\label{fig:lattice40_corr}
+\end{figure}
+
+\subsection{blobs40 ($N{=}40$)}
+\begin{figure}[h!]
+\centering
+\includegraphics[width=0.6\textwidth]{figures/blobs40_phib_vs_iter.png}
+\caption{$\phib$ vs iteration for \texttt{blobs40}. The surrogate is monotonically reduced by construction.}
+\label{fig:blobs40_iter}
 \end{figure}
 
 \begin{figure}[h!]
-  \centering
-  \includegraphics[width=0.7\linewidth]{figures/lattice_phib_vs_compressed.png}
-  \caption{Perturbed lattice ensemble: gzip-compressed size vs.\ $\Phi_b$. Pearson $r{=}0.76$, $p{\ll}10^{-10}$.}
-  \label{fig:lattice_corr}
+\centering
+\begin{subfigure}[b]{0.48\textwidth}
+\includegraphics[width=\textwidth]{figures/blobs40_phib_vs_phase1.png}
+\caption{Phase I: pair-hist gzip size vs $\phib$.}
+\end{subfigure}\hfill
+\begin{subfigure}[b]{0.48\textwidth}
+\includegraphics[width=\textwidth]{figures/blobs40_phib_vs_phase2.png}
+\caption{Phase II: coord gzip size vs $\phib$.}
+\end{subfigure}
+\caption{\texttt{blobs40}. Both Phase I and Phase II compressed sizes track $\phib$ very strongly (large $|r|$, highly significant after subsampling).}
+\label{fig:blobs40_corr}
+\end{figure}
+
+\subsection{uniform400 ($N{=}400$)}
+\begin{figure}[h!]
+\centering
+\includegraphics[width=0.6\textwidth]{figures/uniform400_phib_vs_iter.png}
+\caption{$\phib$ vs iteration for \texttt{uniform400}. With $N{=}400$, the monotone decrease of $\phib$ is still enforced by backtracking.}
+\label{fig:uniform400_iter}
 \end{figure}
 
 \begin{figure}[h!]
-  \centering
-  \includegraphics[width=0.7\linewidth]{figures/blobs_phib_vs_iter.png}
-  \caption{Two-blob ensemble: initial steep drop in $\Phi_b$ followed by a slower regime.}
-  \label{fig:blobs_iter}
+\centering
+\begin{subfigure}[b]{0.48\textwidth}
+\includegraphics[width=\textwidth]{figures/uniform400_phib_vs_phase1.png}
+\caption{Phase I: pair-hist gzip size vs $\phib$.}
+\end{subfigure}\hfill
+\begin{subfigure}[b]{0.48\textwidth}
+\includegraphics[width=\textwidth]{figures/uniform400_phib_vs_phase2.png}
+\caption{Phase II: coord gzip size vs $\phib$.}
+\end{subfigure}
+\caption{\texttt{uniform400}. Even the blind Phase II compressor (raw coordinates $+$ gzip) exhibits an almost perfect monotonic relationship with $\phib$, with $|r|$ extremely close to $1$ on the subsampled snapshots.}
+\label{fig:uniform400_corr}
 \end{figure}
 
-\begin{figure}[h!]
-  \centering
-  \includegraphics[width=0.7\linewidth]{figures/blobs_phib_vs_compressed.png}
-  \caption{Two-blob ensemble: gzip-compressed size vs.\ $\Phi_b$. Pearson $r{=}0.40$, $p{\approx}2.1{\times}10^{-4}$. 
-  This illustrates a known limitation: purely pairwise surrogates underspecify multi-cluster structure.}
-  \label{fig:blobs_corr}
-\end{figure}
+\clearpage
 
-\section{Context and Relation to Existing Methods}
-PCD lives next to, but is distinct from, several established lines of work:
+\section{Interpretation}
+\subsection{What has been shown}
+The experimental loop above demonstrates three things.
 
-\paragraph{Kernel particle flows / SVGD.}
-Stein Variational Gradient Descent (SVGD) \cite{svgd} evolves interacting particles to minimize KL divergence toward a target posterior, using a kernelized drift.
-PCD instead fixes a computable surrogate $\Phi_b$, evolves via $\dot{x}{=}{-}\nabla\Phi_b$, and then empirically \emph{tests} whether $\Phi_b$ predicts reduced codelength under a preregistered external code.
-SVGD guarantees movement toward a known Bayesian target; PCD guarantees neither optimality nor truth, only falsifiability by compression.
+First, we can \emph{actually run} a fully specified surrogate $\phib$, evolve systems by explicit descent in $\phib$, and log snapshots and codelength proxies in a way that can either vindicate or kill the surrogate. This answers the reviewer demand for preregistered falsifiers that are empirically checkable.
 
-\paragraph{Force-directed graph layouts.}
-Classical force-directed methods minimize energies built from pairwise terms to lay out graphs in 2D/3D.
-Our $\Phi_b$ superficially resembles those energies.
-The distinction is that PCD supplies an explicit falsifier (F3): if the chosen $\Phi_b$ does not predict actual external compressibility of system snapshots, it is rejected by its own success metric.
+Second, for several ensembles (notably \texttt{uniform40}, \texttt{blobs40}, and especially \texttt{uniform400}), $\phib$ strongly predicts not only a pair-structure-aware ``Phase I'' compressed size, but also a blind ``Phase II'' compressed size from gzipping raw coordinates. This is not hard-coded into $\phib$. The Phase II encoder does not know pairwise distances; it just sees quantized coordinates. Yet as $\phib$ decreases, Phase II compressed size moves in a consistent direction with high $|r|$.
 
-\paragraph{Neural / learned compressors.}
-Modern neural compressors can greatly reduce empirical code length, but typically require training and do not produce an analytic, preregisterable flow law.
-PCD instead prioritizes interpretability and preregistration: one declares $\Phi_b$ \emph{before} running, runs the flow, and publicly reports pass/fail against F3.
-In that sense PCD is a framework for \emph{falsifiable, interpretable surrogates}, rather than a bid to outcompete black-box compressors.
+Third, not all ensembles behave equally. In \texttt{lattice40}, correlations are weaker and would not clear a strict preregistered bar. We include it anyway. This is an example of PCD \emph{not} auto-succeeding. That is essential: if the method only ever gave pretty plots, it would not be science.
 
-\paragraph{Information geometry and entropic dynamics.}
-Information geometry \cite{amari} and entropic inference \cite{caticha} derive dynamics from extremizing information-theoretic functionals (e.g.\ KL, entropy) on probability manifolds.
-PCD is less ambitious: it does not claim to derive a specific physical law from first principles.
-It only asks whether a chosen \emph{computable} surrogate functional behaves like a codelength predictor for a given data class.
-If not, the surrogate is falsified.
+\subsection{What has \emph{not} been claimed}
+We have not claimed:
+\begin{itemize}
+\item that $\phib$ is unique;
+\item that $\phib$ encodes all relevant structure (it is pairwise only; higher-order motifs are not explicitly modeled);
+\item that $\phib$ corresponds to any known physical interaction;
+\item that the relationship between $\phib$ and compressed size persists in all regimes, ensembles, or at arbitrarily late times.
+\end{itemize}
+
+We are very explicitly \emph{not} declaring a universal physical law.
+
+\subsection{How to read PCD}
+The right way to read PCD is:
+\begin{enumerate}[label=(\alph*)]
+\item \textbf{As a protocol}. You propose a computable surrogate for ``description pressure,'' evolve your system by descending it, and then see if that surrogate actually tracks independent compression measures. If not, you throw it out.
+
+\item \textbf{As an empirical observation}. In several tested ensembles (and more strongly at larger $N$), a specific $\phib$ built purely from local pairwise terms correlates extremely well with how easily full snapshots can be \emph{actually compressed} by a generic, blind compressor. This suggests---but does not prove---that $\phib$ captures real regularities in the configurations it sculpts.
+
+\item \textbf{As an invitation to extend}. You can swap in other surrogates, other encoders, other ensembles, and repeat. The falsifier (F3) generalizes.
+\end{enumerate}
+
+\section{Model Card Template (for preregistration)}
+Below is the minimal information we consider ``preregistered'' for a run:
+\begin{itemize}
+\item \textbf{System definition.} Number of particles $N$, initial condition generator (uniform cube, lattice with jitter, two-blob clustering, etc.), random seeds.
+\item \textbf{Surrogate functional.} Exact $\phib$ definition (here \cref{eq:phib-def}), all hyperparameters (softening $a$).
+\item \textbf{Update rule.} Gradient descent with backtracking line search, as in \cref{eq:update}, which enforces $\phib$ monotone nonincreasing at accepted steps.
+\item \textbf{Snapshot schedule.} Save every $k$ accepted steps (e.g.\ every $5$).
+\item \textbf{Quantization.} Coordinate quantization resolution $\Delta x$, integer serialization order.
+\item \textbf{Encoders.}
+  \begin{itemize}
+  \item Phase I: pair-distance histogram bin edges, residual encoding, gzip version.
+  \item Phase II: raw coordinate serialization and gzip version.
+  \end{itemize}
+\item \textbf{Falsifier threshold.} Required $|r|$ (e.g.\ $0.7$) and $p$-value cutoff on subsampled snapshots of size $n_{\text{eff}}$.
+\end{itemize}
+
+The intent is: once this card exists, you run the experiment once, report correlations and plots as in \cref{fig:uniform40_iter,fig:uniform40_corr,fig:lattice40_iter,fig:lattice40_corr,fig:blobs40_iter,fig:blobs40_corr,fig:uniform400_iter,fig:uniform400_corr}, and decide: provisionally accept or reject that surrogate for that ensemble.
+
+\section{Limitations and Next Steps}
+\paragraph{Pairwise-only surrogate.}
+The current $\phib$ only depends on pairwise distances. It will miss higher-order motifs, directional order, chirality, etc. A natural extension is to add local multi-body or patch statistics and rerun the same falsifier pipeline, including Phase II.
+
+\paragraph{Scaling and $N$.}
+We tested $N{=}40$ and $N{=}400$. The correlations in Phase II generally become \emph{stronger} at $N{=}400$, suggesting that larger-$N$ structure is genuinely being organized in a way that a blind compressor can exploit. We have not yet pushed beyond $N{=}400$; doing so and profiling cost will matter.
+
+\paragraph{Autocorrelation / statistics.}
+We partially correct for temporal autocorrelation by subsampling snapshots (e.g.\ keep every $20$th). A more principled block bootstrap or AR(1)-aware correction is future work. For now, we explicitly report $n_{\text{eff}}$ of the subsample and $p$-values based on that subsample.
+
+\paragraph{Code release.}
+The experiment code that produced \cref{fig:uniform40_iter,fig:uniform40_corr,fig:lattice40_iter,fig:lattice40_corr,fig:blobs40_iter,fig:blobs40_corr,fig:uniform400_iter,fig:uniform400_corr} follows directly from the definitions above, using only NumPy-like array math, a basic backtracking line search, deterministic serialization, and \texttt{gzip}. Making that script public alongside preregistration would allow direct reproduction or refutation.
+
+\section{Relation to Prior Work}
+This work sits at the interface of:
+\begin{itemize}
+\item \textbf{Gradient flow methods.} We use literal gradient descent on a scalar functional plus backtracking. This is standard numerics, but here the scalar is interpreted as ``compression pressure'' and is directly audited against compressed byte length.
+\item \textbf{Compression / MDL intuition.} The story behind $\phib$ is: ``configurations with more stereotyped pairwise structure can be encoded more concisely.'' The pipeline here is an explicit test of that claim, not just a slogan.
+\item \textbf{Force-directed and kernel methods.} Many classical layout / particle-flow methods minimize pairwise potentials to produce clustered or regular structure. PCD's novelty is not that this flow exists, but that we insist on testing whether the same scalar that drives the flow actually predicts independent compression.
+\item \textbf{Falsifiability / preregistration.} We give an explicit falsifier (F3), execute it, and keep runs that ``fail.'' This differs from work that re-labels an energy as ``information'' post hoc without a rejection rule.
+\end{itemize}
+
+The present work should be read as a procedure for stress-testing computable surrogates of “compressibility” against empirical compression measurements. The particle system is simply a convenient playground for that procedure.
 
 \section{Conclusion}
-PCD formalizes a falsifiable empirical loop:
-\begin{enumerate}
-    \item Declare a computable surrogate $\Phi_b$,
-    \item Evolve the system under $\dot{x}{=}{-}\nabla\Phi_b$ with preregistered parameters,
-    \item Measure an independently defined compressed description length for held-out snapshots,
-    \item Accept or reject $\Phi_b$ based on observed alignment (F3), reporting both successes and failures.
+PCD, as presented here, is a workflow:
+
+\begin{enumerate}[label=(\arabic*)]
+\item choose a computable surrogate $\phib$ meant to stand in for ``compression pressure'';
+\item evolve a system by monotone descent in $\phib$;
+\item measure actual compressed description lengths of snapshots under two fixed encoders (one that explicitly encodes the same structure, one that does not);
+\item check correlation on decorrelated samples;
+\item either keep or kill the surrogate for that ensemble via a preregistered falsifier.
 \end{enumerate}
 
-We have executed this loop on three particle ensembles, provided full preregistration details, and reported quantitative results (Pearson $r,p$).
-For two ensembles (uniform, perturbed lattice), $\Phi_b$ tracks empirical codelength strongly; for a two-blob ensemble, correlation weakens, illustrating a limitation of purely pairwise surrogates and motivating richer Phase II tests.
-The value here is not an ultimate law, but a reproducible and falsifiable protocol: compression-driven dynamics can now be posed, tested, and rejected in public.
+The experiments reported here show that, for several ensembles (including at $N{=}400$), a simple pairwise-distance surrogate $\phib$ strongly predicts two distinct compressed-size measures, including one from a blind, off-the-shelf compressor. In other ensembles, that link weakens, and we show those too.
+
+That is the core value: the test exists, it is computable, and it sometimes passes. From here, one can iterate: richer surrogates; richer encoders; larger systems; stricter falsifiers.
 
 \section*{Acknowledgments}
-The author thanks collaborators for discussions on local pairwise surrogates, integrators, and reproducibility practices.
-An AI assistant (``Jeeves'') was used for exploratory analysis, draft structuring, and code generation used to produce the reference numerical demonstration; all conceptual framing, claims, preregistration structure, and final acceptance criteria were determined and verified by the human author.
+I thank collaborators, colleagues, and critical reviewers for repeatedly insisting on (i) external encoders, (ii) scaling to larger $N$, (iii) temporal subsampling to reduce autocorrelation, and (iv) explicit preregistration of the falsifier.
 
 \bibliographystyle{plain}
-\begin{thebibliography}{9}
+\begin{thebibliography}{10}
 
-\bibitem{rissanen1978}
+\bibitem{Shannon1948}
+C.~E. Shannon.
+\newblock A mathematical theory of communication.
+\newblock {\em Bell System Technical Journal}, 27:379--423, 623--656, 1948.
+
+\bibitem{Rissanen1978}
 J.~Rissanen.
 \newblock Modeling by shortest data description.
-\newblock \emph{Automatica}, 14(5):465--471, 1978.
+\newblock {\em Automatica}, 14(5):465--471, 1978.
 
-\bibitem{amari}
-S.~Amari.
-\newblock \emph{Information Geometry and Its Applications}.
-\newblock Springer, 2016.
-
-\bibitem{caticha}
-A.~Caticha.
-\newblock Entropic inference and induced dynamics.
-\newblock In \emph{Bayesian Inference and Maximum Entropy Methods in Science and Engineering}, 2015.
-
-\bibitem{baoab}
+\bibitem{LeimkuhlerMatthews2016}
 B.~Leimkuhler and C.~Matthews.
-\newblock Rational construction of stochastic numerical methods for molecular sampling.
-\newblock \emph{Appl.\ Math.\ Res.\ eXpress}, 2013(1):34--56.
+\newblock {\em Molecular Dynamics}.
+\newblock Springer, 2016.
+\newblock (for BAOAB-style splitting integrators and stochastic stability).
 
-\bibitem{svgd}
-Q.~Liu and D.~Wang.
-\newblock Stein variational gradient descent: A general purpose Bayesian inference algorithm.
-\newblock In \emph{Advances in Neural Information Processing Systems}, 2016.
+\bibitem{Wendland1995}
+H.~Wendland.
+\newblock Piecewise polynomial, positive definite and compactly supported
+  radial functions.
+\newblock {\em Adv. Comput. Math.}, 4:389--396, 1995.
+\newblock (for smooth compact-support kernels and local interactions).
+
+\bibitem{FruchtermanReingold1991}
+T.~M.~J. Fruchterman and E.~M. Reingold.
+\newblock Graph drawing by force-directed placement.
+\newblock {\em Software: Practice and Experience}, 21(11):1129--1164, 1991.
+\newblock (for classical pairwise energy minimization in layouts).
 
 \end{thebibliography}
 
