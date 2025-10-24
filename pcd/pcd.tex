@@ -27,6 +27,7 @@
 }
 
 \numberwithin{equation}{section}
+
 % Theorem environments
 \newtheorem{proposition}{Proposition}[section]
 \newtheorem{lemma}{Lemma}[section]
@@ -42,23 +43,23 @@
 A Methodological Framework for Computable Information-Motivated Modeling}
 
 \author[1]{Mats Helander}
-\author[1]{Jeeves}
+\author[1]{Jeeves\thanks{Jeeves is a pseudonym for an AI assistant contributing to analysis, code design, and manuscript preparation.}}
 \affil[1]{Independent Research}
-\date{Dated: October 22, 2025}
+\date{Dated: October 24, 2025}
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
 \noindent
-We present \emph{Predictive Compression Dynamics} (PCD), a methodological recipe for constructing \emph{computable}, local functionals $\widehat{\Phi}$ and driving dynamics by gradient flow $\dot x=-\nabla\widehat{\Phi}(x)$ with preregistered parameters. Two concrete instances are given: (i) a fixed-graph pair functional and (ii) a smooth compact-support kernel; both yield an attractive inverse-square two-body form (after calibration) and admit Lyapunov descent. These models serve as methodological demonstrations of computable, information-motivated dynamics. We make the MDL split $L_{\text{tot}}=L(M)+L(D\mid M)$ explicit, give a minimal coding scheme linking $-\widehat{\Phi}$ descent to achievable $\Delta L_{\text{tot}}$, address well-posedness (smooth-kernel variant), recommend robust integrators (BAOAB for Langevin), and provide a preregistration/model-card template and falsifiers for a chosen model instance. The goal is a reproducible toolbox for compression-driven dynamics across domains.
+We present \emph{Predictive Compression Dynamics} (PCD), a methodological recipe for constructing \emph{computable}, local functionals $\Phi_b$ and driving dynamics by gradient flow $\dot x=-\nabla\Phi_b(x)$ with preregistered parameters. Two concrete instances are given: (i) a fixed-graph pair functional and (ii) a smooth compact-support kernel; both yield stable, attractive gradient terms (after calibration) and admit Lyapunov descent. These models serve as methodological demonstrations of computable, information-motivated optimization. We make the MDL split $L_{\text{tot}}=L(M)+L(D\mid M)$ explicit, give a minimal coding scheme linking $\Phi_b$ descent to achievable $\Delta L_{\text{tot}}$, address well-posedness (smooth-kernel variant), recommend robust integrators (BAOAB for Langevin), and provide a preregistration/model-card template and falsifiers for a chosen model instance. The goal is a reproducible toolbox for compression-driven dynamics across domains.
 \end{abstract}
 
 \section{Positioning and Commitments}
-A disciplined workflow to construct and test \emph{computable} local functionals $\widehat{\Phi}$ whose gradients define dynamics, with explicit preregistration (domain, discretization, kernels, parameters) and sanity checks.
+A disciplined workflow to construct and test \emph{computable} local functionals $\Phi_b$ whose gradients define algorithmic descent rules, with explicit preregistration (domain, discretization, kernels, parameters), numerical sanity checks, and internal falsifiers.
 
 \section{Operational Domain and Notation}
-We consider $N$ point \emph{particles} with positions $x_i\in\R^3$ and positive weights $m_i$. Computations use finite precision: lattice spacing $a_{\text{grid}}$ and $b$ bits/axis, stated \emph{a priori}. A global calibration constant $G_{\text{eff}}>0$ maps dimensionless forces to physical units. \emph{Design choice:} we use the same $m_i$ in the interaction and as inertial mass; this incidentally yields accelerations independent of $m_i$ by construction.
+We consider $N$ point particles with positions $x_i\in\R^3$ and positive weights $m_i$. Computations use finite precision: lattice spacing $a_{\text{grid}}$ and $b$ bits/axis, stated \emph{a priori}. The subscript $b$ in $\Phi_b$ denotes dependence on numerical precision (bits of representation). A global calibration constant $G_{\text{eff}}>0$ maps dimensionless gradients to physical units if desired. Using identical $m_i$ in both interaction and inertial terms is a modeling simplification that enforces equal accelerations by design. Vectors are written in plain type for brevity.
 
 \section{Model--Data Decomposition and Coding Link}
 Following MDL, we split description length as
@@ -66,93 +67,104 @@ Following MDL, we split description length as
 \label{eq:Ltot}
 L_{\text{tot}} = L(M) + L(D\mid M),
 \end{equation}
-where $L(M)$ encodes modeled regularities and $L(D\mid M)$ encodes residuals given $M$. A decrease $\Delta L_{\text{tot}}<0$ corresponds to realized compression. PCD treats a computable, local $\widehat{\Phi}$ as a proxy for (the negative of) an achievable $\Delta L_{\text{tot}}$; thus $\dot x=-\nabla\widehat{\Phi}$ implements a descent in achievable codelength under the chosen surrogate. 
-This identification is heuristic and intended only as a modelling analogy.
+where $L(M)$ encodes modeled regularities and $L(D\mid M)$ encodes residuals given $M$. A decrease $\Delta L_{\text{tot}}<0$ corresponds to realized compression. PCD treats a computable, local $\Phi_b$ as a proxy for the achievable total codelength $L_{\text{tot}}$ itself; hence $\dot x=-\nabla\Phi_b$ implements a descent in surrogate description length under the chosen model family.
 
 \paragraph{Minimal explicit coding scheme.}
 Let $(i,j)$ range over a symmetric set of ``near'' pairs. A two-part code describes (i) a shared pairwise template per distance bin and (ii) residual offsets:
 \begin{itemize}
-\item Partition distances into bins $\{B_k\}$ with centers $r_k$; encode the histogram counts with a prefix-free code.
-\item For each pair $(i,j)$ with $r_{ij}\in B_k$, encode a residual offset relative to a shared template; the expected residual codelength per pair is a decreasing function $\ell(r_{ij})$.
+\item Partition distances into bins $\{B_k\}$ with centers $r_k$; encode the histogram counts using an arithmetic code with probability $p_k$ proportional to frequency.
+\item For each pair $(i,j)$ with $r_{ij}\in B_k$, encode a residual offset $\delta r_{ij}$ relative to $r_k$ using bounded precision.
 \end{itemize}
-Then, for fixed binning overhead and under mild regularity,
+The expected codelength per pair is
+\[
+\ell(r_{ij}) = -\log p_k + H_{\mathrm{res}}(\delta r \mid B_k),
+\]
+and the overall code is prefix-free, satisfying Kraft’s inequality. Then
 \begin{equation}
 \label{eq:Ltotsum}
 L_{\text{tot}} \approx \text{const} + \sum_{(i,j)} \ell(r_{ij}).
 \end{equation}
-Choosing $\widehat{\Phi}\propto -\sum_{(i,j)} \ell(r_{ij})$ makes $-\nabla\widehat{\Phi}$ a proxy for the gradient of achievable compression. A smooth choice $\ell(r)\approx (r^2+a^2)^{-1/2}$ yields closed-form forces below.
+Choosing
+\[
+\Phi_b \;\propto\; \sum_{(i,j)} \ell(r_{ij})
+\]
+makes $-\nabla\Phi_b$ a gradient descent in achievable total codelength. A convenient smooth surrogate is
+\[
+\ell(r)\approx (r^2+a^2)^{-1/2},
+\]
+which provides bounded curvature at $r=0$ and $1/r$ asymptotics. Other forms may be substituted without altering the workflow.
 
 \begin{proposition}[Surrogate MDL Descent]
 \label{prop:mdl-descent}
-Suppose $L_{\text{tot}}=\mathrm{const}+\sum_{(i,j)}\ell(r_{ij})$ with $\ell'(r)\le 0$ and 
-$\widehat{\Phi}=-\kappa\sum_{(i,j)}\ell(r_{ij})$ for some $\kappa>0$. 
-Then along $\dot x=-\nabla\widehat{\Phi}(x)$ we have $\frac{d}{dt}L_{\text{tot}}(x(t))\le 0$,
-with equality iff $\nabla\widehat{\Phi}(x(t))=0$.
+Suppose $L_{\text{tot}}=\mathrm{const}+\sum_{(i,j)}\ell(r_{ij})$ with $\ell'(r)\le 0$ and $\Phi_b=\kappa\sum_{(i,j)}\ell(r_{ij})$ for some $\kappa>0$. 
+Then along $\dot x=-\nabla\Phi_b(x)$ we have
+\begin{equation}
+\frac{d}{dt}\Phi_b(x(t))=-\|\nabla\Phi_b(x(t))\|^2\le0,
+\end{equation}
+with equality iff $\nabla\Phi_b(x(t))=0$.
 \end{proposition}
+\noindent\emph{Interpretation.} $\Phi_b$ is a computable surrogate for total codelength; its monotone decrease under $\dot x=-\nabla\Phi_b$ represents achievable compression within the chosen model family.
 
-\noindent\emph{Sketch.} $\frac{d}{dt}L_{\text{tot}}=\langle\nabla L_{\text{tot}},\dot x\rangle
-= -\kappa^{-1}\langle\nabla\widehat{\Phi},\nabla\widehat{\Phi}\rangle \le 0.$
+\section{Information-Motivated Surrogates for Gradient Descent}
 
-\section{Information-Motivated Functionals}
-\subsection{Fixed-graph functional (corrected notation)}
+\subsection{Fixed-graph functional}
 Let $E\subset\{(i,j):\,1\le i<j\le N\}$ be a symmetric, degree-bounded edge set. Define
 \begin{equation}
 \label{eq:phiE}
-\widehat{\Phi}_E(x)= -\sum_{(i,j)\in E} \frac{m_im_j}{\sqrt{\lVert x_i-x_j\rVert^2+a^2}},\qquad a>0.
+\Phi_E(x)= \sum_{(i,j)\in E} \frac{m_im_j}{\sqrt{\lVert x_i-x_j\rVert^2+a^2}},\qquad a>0.
 \end{equation}
-The minus sign ensures attraction under descent; $a$ regularizes collisions. The force on $i$ is
+The gradient term for element $i$ is
 \begin{align}
 \label{eq:forceE}
-F^{(E)}_i(x)
-&= -\nabla_{x_i}\widehat{\Phi}_E(x)
+G^{(E)}_i(x)
+&= -\nabla_{x_i}\Phi_E(x)
 = -\sum_{\substack{j:\\(i,j)\in E}}
 m_im_j\,\frac{(x_i-x_j)}{\big(\lVert x_i-x_j\rVert^2+a^2\big)^{3/2}}.
 \end{align}
-Two-body, $a\to 0$, $(i,j)\in E$ gives the attractive inverse-square form:
+In the two-particle case with $(i,j)\in E$ and $a\to 0$,
 \begin{equation}
 \label{eq:twoBody}
-F^{(E)}_i \to -\,m_im_j\,\frac{x_i-x_j}{\lVert x_i-x_j\rVert^3}.
+G^{(E)}_i \to -\,m_im_j\,\frac{x_i-x_j}{\lVert x_i-x_j\rVert^3},
 \end{equation}
+i.e.\ an attractive inverse-square form along the inter-particle direction.
 
-\subsection{Smooth-kernel functional (well-posedness)}
+\subsection{Smooth-kernel functional}
 To avoid neighbor-set discontinuities, choose a compactly supported, $C^1$ radial kernel $K_\sigma:[0,\infty)\to\R_{\ge 0}$ with support $\subset[0,R\sigma]$. Define
 \begin{equation}
 \label{eq:phiK}
-\widehat{\Phi}_K(x)= -\sum_{i<j} m_im_j\,K_\sigma\!\big(\lVert x_i-x_j\rVert\big),
+\Phi_K(x)= \sum_{i<j} m_im_j\,K_\sigma\!\big(\lVert x_i-x_j\rVert\big),
 \end{equation}
-so $F^{(K)}_i(x)=-\nabla_{x_i}\widehat{\Phi}_K(x)$ is continuous and locally Lipschitz off collisions. If $K_\sigma(r)\sim (r^2+a^2)^{-1/2}$ near $r=0$, one recovers the regularized two-body form \eqref{eq:twoBody}.
+so $G^{(K)}_i(x)=-\nabla_{x_i}\Phi_K(x)$ is continuous and locally Lipschitz off collisions. If $K_\sigma(r)\sim (r^2+a^2)^{-1/2}$ near $r=0$, one recovers the regularized two-particle form \eqref{eq:twoBody}.
 
-\section{Dynamics and Integrators}
-With $\dot x=-\nabla\widehat{\Phi}(x)$,
-\begin{equation}
-\frac{d}{dt}\widehat{\Phi}(x(t)) = -\lVert\nabla\widehat{\Phi}(x(t))\rVert^2 \le 0,
-\end{equation}
-so $\widehat{\Phi}$ is a Lyapunov function. We preregister all parameters $(a_{\text{grid}},b,a,\sigma,\Delta t,m_i,\gamma,T,\text{seeds})$.
+\section{Algorithmic Dynamics and Integrators}
+We preregister all parameters $(a_{\text{grid}},b,a,\sigma,\Delta t,m_i,\gamma,T,\text{seeds})$.
 
 \begin{lemma}[Compression-Rate Identity]
 \label{lem:compression-rate}
-Under $\dot x=-\nabla\widehat{\Phi}(x)$ the quantity 
-$\dot C_{\mathrm{alg}}(t):=-\frac{d}{dt}\widehat{\Phi}(x(t))$ equals 
-$\|\nabla\widehat{\Phi}(x(t))\|^2\ge 0$. Hence $\widehat{\Phi}$ is a Lyapunov function and
-$\dot C_{\mathrm{alg}}$ is the instantaneous achievable compression rate.
+Under $\dot x=-\nabla\Phi_b(x)$ the instantaneous surrogate codelength rate is 
+\begin{equation}
+\dot \Phi_b(t)=-\|\nabla\Phi_b(x(t))\|^2\le0.
+\end{equation}
+Hence $\Phi_b$ is a Lyapunov function and its monotone decrease represents achievable compression under the model.
 \end{lemma}
 
 \paragraph{Deterministic gradient flow.}
 Explicit Euler:
 \begin{equation}
-x_i^{(t+\Delta t)} = x_i^{(t)} + \Delta t\,F_i(x^{(t)}),\quad F_i\in\{F^{(E)}_i,F^{(K)}_i\}.
+x_i^{(t+\Delta t)} = x_i^{(t)} + \Delta t\,G_i(x^{(t)}),\quad 
+G_i\in\{G^{(E)}_i,G^{(K)}_i\}.
 \end{equation}
 For stability, use adaptive $\Delta t$ or semi-implicit variants.
 
-\paragraph{Underdamped Langevin (BAOAB recommended).}
+\paragraph{Stochastic descent (BAOAB recommended).}
 \begin{equation}
-m_i\ddot{x}_i = F_i(x)-\gamma\,\dot{x}_i + \xi_i(t),\quad
+m_i\ddot{x}_i = G_i(x)-\gamma\,\dot{x}_i + \xi_i(t),\quad
 \langle \xi_i(t)\xi_j(t')\rangle=2\gamma k_B T\,\delta_{ij}\delta(t-t').
 \end{equation}
 We recommend the BAOAB integrator with reported weak/strong orders.
 
 \section{Sanity Checks}
-With $a\to 0$ and a single pair, \eqref{eq:twoBody} holds (after one calibration $G_{\text{eff}}$).  
+With $a\to 0$ and a single pair, \eqref{eq:twoBody} holds (after calibration $G_{\text{eff}}$).  
 For $r\gg a$,
 \begin{align}
 \frac{r}{(r^2+a^2)^{3/2}}
@@ -160,35 +172,41 @@ For $r\gg a$,
 \end{align}
 so
 \begin{equation}
-\big\lVert F^{(E)}_i\big\rVert
+\big\lVert G^{(E)}_i\big\rVert
 = m_im_j\,\frac{r}{(r^2+a^2)^{3/2}}
 \approx m_im_j\,\frac{1}{r^2}\left(1-\frac{3a^2}{2r^2}\right).
 \end{equation}
 These expansions serve purely as numerical consistency checks.
 
 \section{Well-posedness}
-For $a>0$ and bounded degree, $\widehat{\Phi}_E\in C^1(\R^{3N}\setminus\{x_i=x_j\})$ and $F^{(E)}$ is locally Lipschitz off collisions. For $C^1$ kernels with bounded $K'_\sigma$, $F^{(K)}$ is continuous and locally Lipschitz. Existence and uniqueness follow by Picard–Lindelöf on compact intervals. For dynamic $k$NN, forces are piecewise smooth; employ hysteresis or prefer the smooth kernel.
+For $a>0$ and bounded degree, $\Phi_E\in C^1(\R^{3N}\setminus\{x_i=x_j\})$ and $G^{(E)}$ is locally Lipschitz off collisions. For $C^1$ kernels with bounded $K'_\sigma$, $G^{(K)}$ is continuous and locally Lipschitz. Existence and uniqueness follow by Picard--Lindelöf on compact intervals. For dynamic $k$NN, gradients are piecewise smooth; employ hysteresis or prefer the smooth kernel.
 
 \section{Preregistered Model Card (example)}
-\textbf{Domain.} $a_{\text{grid}}=\SI{10}{\micro m}$, $b=16$. \\
-\textbf{Functional.} $\widehat{\Phi}_K$ with Wendland $C^2$ kernel ($\sigma=\SI{0.5}{mm}$); softening $a=\SI{50}{\micro m}$. \\
-\textbf{Dynamics.} BAOAB underdamped with $(m_i\equiv 1,\gamma=0.1,T=\SI{300}{K})$, $\Delta t=\SI{1e-3}{s}$. \\
-\textbf{Calibration.} Single $G_{\text{eff}}$ fit in a dilute two-body sandbox at $r\gg a$. \\
+\textbf{Domain.} $a_{\text{grid}}=\SI{10}{\micro\meter}$, $b=16$.\\
+\textbf{Functional.} $\Phi_K$ with Wendland $C^2$ kernel ($\sigma=\SI{0.5}{\milli\meter}$); softening $a=\SI{50}{\micro\meter}$.\\
+\textbf{Dynamics.} BAOAB stochastic descent with $(m_i\equiv 1,\gamma=0.1,T=\SI{300}{\kelvin})$, $\Delta t=\SI{1e-3}{\second}$.\\
+\textbf{Calibration.} Fit $G_{\text{eff}}$ by least-squares on the slope of $\lVert G^{(E)}_i\rVert$ versus $r^{-2}$ across sampled separations in a dilute two-point sandbox at $r\gg a$; hold fixed thereafter.\\
 \textbf{Sanity checks.} Verify \eqref{eq:twoBody} and the far-field expansion; report seeds and residuals.
 
-\section{Falsifiers for a chosen instance}
-Given fixed $(\widehat{\Phi},\text{params})$, declare the instance falsified if:
+\section{Falsifiers for a Chosen Instance}
+Given fixed $(\Phi_b,\text{params})$, declare the instance falsified if:
 \begin{enumerate}[label=(F\arabic*)]
-\item Two-body trajectories disagree with the calibrated inverse-square form beyond numerical error.
+\item Two-point trajectories disagree with the calibrated reference form beyond numerical error.
 \item Smooth-kernel vs fixed-graph variants differ systematically at small $r$ beyond topology effects.
-\item The code-length proxy correlates poorly with realized compression in controlled tests (e.g.\ $-\widehat{\Phi}$ vs measured $L_{\text{tot}}$).
+\item The surrogate $\Phi_b$ correlates poorly with \emph{out-of-sample} compression of generated data (e.g.\ compare $\Phi_b$ to actual Lempel--Ziv compression of held-out pair-distance histograms rather than the in-sample surrogate).
 \end{enumerate}
 
 \section{Discussion and Scope}
-PCD supplies a reproducible route from \emph{computable} information-motivated functionals to concrete dynamics. Future work will extend this framework to broader estimator families under the same preregistration discipline.
+PCD supplies a reproducible route from \emph{computable} information-motivated functionals to concrete algorithmic descent schemes. That simple pairwise surrogates coincide with familiar inverse-square interactions is a feature for validation, not a claim of novelty. Future work will broaden $\Phi_b$ (e.g.\ learned local codes, graph Laplacians) under the same preregistration discipline.
+
+\paragraph{Application domains.}
+Although demonstrated on abstract particle configurations, the same workflow applies wherever local similarity drives redundancy reduction---particle-based learning objectives, swarm control, coarse-grained fluid solvers, or clustering under computational constraints. The physical units in examples (\si{\micro\meter}--\si{\milli\meter}) serve only as scale illustrations.
+
+\section{Context and Relation to Existing Frameworks}
+PCD complements algorithmic-thermodynamic and information-geometric programs by operating directly in finite-precision configuration space, with explicitly computable surrogates and preregistered parameters. It resembles force-directed graph energies and kernel particle flows such as Stein variational gradient descent (SVGD), but contributes (i) an explicit codelength linkage via $\Phi_b$, (ii) a preregistered model card with declared parameters and calibration, and (iii) built-in falsifiers tied to out-of-sample compression. Unlike entropic-gravity or holographic approaches, PCD makes no physical claims beyond algorithmic optimization.
 
 \section*{Acknowledgments}
-We thank colleagues for discussions on local estimators, kernels, integrators, and $N$-body numerics. Earlier drafts that explored alternative framings are superseded by this methodological formulation.
+We thank colleagues for discussions on local estimators, kernels, integrators, and numerical reproducibility. Earlier drafts exploring broader interpretations are superseded by this methodological formulation.
 
 \section*{References}
 \begin{thebibliography}{12}
@@ -201,9 +219,9 @@ L.\ A.\ Levin, ``On the notion of a random sequence,'' \emph{Sov.\ Math.\ Dokl.}
 \bibitem{Amari2016}
 S.\ Amari, \emph{Information Geometry and Its Applications}, Springer (2016).
 \bibitem{JordanKinderlehrerOtto1998}
-R.\ Jordan, D.\ Kinderlehrer, F.\ Otto, ``The variational formulation of the Fokker–Planck equation,'' \emph{SIAM J.\ Math.\ Anal.} \textbf{29} (1998).
+R.\ Jordan, D.\ Kinderlehrer, F.\ Otto, ``The variational formulation of the Fokker--Planck equation,'' \emph{SIAM J.\ Math.\ Anal.} \textbf{29} (1998).
 \bibitem{Caticha2012}
-A.\ Caticha, \emph{Entropic Inference and the Foundations of Physics}, (2012).
+A.\ Caticha, \emph{Entropic Inference and the Foundations of Physics} (2012).
 \bibitem{Wendland1995}
 H.\ Wendland, ``Piecewise polynomial, positive definite and compactly supported radial functions,'' \emph{Adv.\ Comput.\ Math.} \textbf{4} (1995) 389--396.
 \bibitem{LeimkuhlerMatthews2013}
