@@ -280,7 +280,7 @@ We emphasize:
 \item We do not delete ``bad'' runs; \texttt{lattice40} is reported alongside \texttt{uniform40}, \texttt{blobs40}, and \texttt{uniform400}.
 \item Phase II is explicitly split into IIa (fixed order) and IIb (shuffled order) to address coordinate-ordering artifacts.
 \item We sweep $\Delta x$ across three orders of magnitude to test quantization sensitivity.
-\item $N{=}400$ is included to answer the reviewer's request that compression behavior be measured at larger scale.
+\item $N{=}400$ is included to answer the request that compression behavior be measured at larger scale.
 \end{itemize}
 
 \section{Results}
@@ -301,13 +301,13 @@ Representative trends:
 $\phib$ shows a strong relationship with both Phase I and Phase IIa compressed size across multiple $\Delta x$. The Phase IIb (shuffled-order) correlations remain large in magnitude, indicating that the signal is not purely an ordering artifact. The naive geometric baselines also correlate with compressed size (as expected for a system that becomes more clustered), but $\phib$ matches or exceeds those baselines for typical $\Delta x=10^{-2}$.
 
 \paragraph{\texttt{lattice40} ($N{=}40$).}
-Correlations between $\phib$ and compressed size are moderate and in several $\Delta x$ settings fall below the preregistered $|r|\ge 0.7$ bar. This ensemble would be marked as a \emph{rejection case} under F3. Baseline geometric metrics perform comparably here, suggesting that $\phib$ is not uniquely informative for this already structured initial condition. Consistent with this, the $\phib$ vs iteration curve exhibits plateaus and small jumps rather than a smooth, dramatic descent.
+Correlations between $\phib$ and compressed size are moderate and, in some $\Delta x$ settings, fall below the preregistered $|r|\ge 0.7$ bar. This ensemble is marked as a \emph{rejection case} under F3. Baseline geometric metrics perform comparably or better here, suggesting that $\phib$ is not uniquely informative for this already structured initial condition. Consistent with this, the $\phib$ vs iteration curve exhibits plateaus and small jumps rather than a smooth, dramatic descent.
 
 \paragraph{\texttt{blobs40} ($N{=}40$).}
 We observe very high $|r|$ between $\phib$ and both Phase I and Phase IIa compressed size. These high-magnitude correlations persist under Phase IIb shuffling and across all tested $\Delta x$, demonstrating that the $\phib \leftrightarrow$ compressed-size link is not solely due to serialization order. Baseline geometric metrics (especially mean nearest-neighbor distance) are also strongly predictive in this highly clustered two-blob configuration, but $\phib$ remains competitive with them.
 
 \paragraph{\texttt{uniform400} ($N{=}400$).}
-At $N{=}400$, $\phib$ and the Phase IIa compressed size exhibit an almost perfectly monotonic relationship, with $|r|$ extremely close to $1$ for multiple $\Delta x$ (notably $\Delta x=10^{-3}$). This persists under Phase IIb shuffling, indicating that the effect is not just an ordering artifact. Importantly, $\phib$'s correlation with compressed size is at least as strong as (and in some $\Delta x$ cases stronger than) radius of gyration, nearest-neighbor distance, or coordinate variance. This addresses the ``any simple clumping metric would work'' objection: at scale, $\phib$ is at least as predictive as the obvious baselines and sometimes more so.
+At $N{=}400$, $\phib$ and the Phase IIa compressed size exhibit an almost perfectly monotonic relationship, with $|r|$ extremely close to $1$ for multiple $\Delta x$ (notably $\Delta x=10^{-3}$). This persists under Phase IIb shuffling, indicating that the effect is not just an ordering artifact. Importantly, $\phib$'s correlation with compressed size is at least as strong as (and in some $\Delta x$ cases stronger than) radius of gyration, nearest-neighbor distance, or coordinate variance. This addresses the objection that ``any simple clumping metric would work'': at scale, $\phib$ is at least as predictive as the obvious baselines.
 
 \paragraph{Takeaways.}
 \begin{itemize}
@@ -317,18 +317,16 @@ At $N{=}400$, $\phib$ and the Phase IIa compressed size exhibit an almost perfec
 \item We report $r$ and $n_{\text{eff}}$, not $p$-values, because snapshots along a single trajectory are temporally autocorrelated.
 \end{itemize}
 
-This is exactly the kind of pass/fail signal PCD is designed to expose. The method does not guarantee success for every surrogate on every ensemble; it gives you a way to find out when it fails.
-
 \section{Figures}
-We illustrate (i) the monotone descent of $\phib$ over accepted iterations, and (ii) scatterplots of Phase IIa / IIb compressed size vs $\phib$. Points are subsampled snapshots (every 20th accepted step). Color encodes snapshot time (iteration index); darker points are later.
+We illustrate (i) the monotone descent of $\phib$ over accepted iterations, and (ii) scatterplots of compressed size vs $\phib$ under the three encoders: Phase IIa (fixed-order coordinates), Phase IIb (shuffled-order control), and Phase I (pair-distance histogram). Points are subsampled snapshots (every 20th accepted step). Color encodes snapshot time (iteration index); darker points are later.
 
-For $N{=}40$ ensembles we show $\Delta x = 10^{-2}$, and for $N{=}400$ we show $\Delta x = 10^{-3}$, which are representative of the trends across all tested $\Delta x$.
+For $N{=}40$ ensembles we show $\Delta x = 10^{-2}$, and for $N{=}400$ we show $\Delta x = 10^{-3}$. These are representative of the trends across all tested $\Delta x$.
 
-\subsection{uniform40 ($N{=}40$, $\Delta x = 10^{-2}$)}
+\subsection{\texttt{uniform40} ($N{=}40$, $\Delta x = 10^{-2}$)}
 \begin{figure}[h!]
 \centering
 \includegraphics[width=0.6\textwidth]{figures/uniform40_dx0.01_phib_vs_iter.png}
-\caption{$\phib$ vs iteration for \texttt{uniform40}, showing enforced monotone descent under backtracked gradient steps.}
+\caption{\texttt{uniform40}. $\phib$ vs iteration, showing enforced monotone descent under backtracked gradient steps.}
 \label{fig:uniform40_iter}
 \end{figure}
 
@@ -336,25 +334,25 @@ For $N{=}40$ ensembles we show $\Delta x = 10^{-2}$, and for $N{=}400$ we show $
 \centering
 \begin{subfigure}[b]{0.32\textwidth}
 \includegraphics[width=\textwidth]{figures/uniform40_dx0.01_phib_vs_phase2a.png}
-\caption{Phase IIa: fixed-order coords.}
+\caption{Phase IIa: fixed-order coords (gzip).}
 \end{subfigure}\hfill
 \begin{subfigure}[b]{0.32\textwidth}
 \includegraphics[width=\textwidth]{figures/uniform40_dx0.01_phib_vs_phase2b.png}
-\caption{Phase IIb: shuffled coords.}
+\caption{Phase IIb: shuffled-order coords (gzip).}
 \end{subfigure}\hfill
 \begin{subfigure}[b]{0.32\textwidth}
 \includegraphics[width=\textwidth]{figures/uniform40_dx0.01_phib_vs_phase1.png}
-\caption{Phase I: pair-distance histogram.}
+\caption{Phase I: pair-distance histogram (gzip).}
 \end{subfigure}
-\caption{\texttt{uniform40}, $\Delta x{=}10^{-2}$. Each point is one subsampled snapshot. Color indicates iteration index (later = darker). Phase IIb shows that strong correlation with $\phib$ persists even after randomizing particle order before compression. Phase I shows the expected internal-consistency correlation with pairwise structure.}
+\caption{\texttt{uniform40}, $\Delta x{=}10^{-2}$. Each point is one subsampled snapshot. Color indicates iteration index (later = darker). Left: Phase IIa shows that $\phib$ predicts compressed size for a coordinate-only encoder. Middle: Phase IIb shows that this survives random shuffling of particle order, addressing ordering artifacts. Right: Phase I shows the internal-consistency relationship between $\phib$ and an explicitly pairwise-distance-based code.}
 \label{fig:uniform40_corr}
 \end{figure}
 
-\subsection{lattice40 ($N{=}40$, $\Delta x = 10^{-2}$)}
+\subsection{\texttt{lattice40} ($N{=}40$, $\Delta x = 10^{-2}$)}
 \begin{figure}[h!]
 \centering
 \includegraphics[width=0.6\textwidth]{figures/lattice40_dx0.01_phib_vs_iter.png}
-\caption{$\phib$ vs iteration for \texttt{lattice40}. $\phib$ decreases overall but exhibits plateaus and jumps, reflecting limited large-scale rearrangement.}
+\caption{\texttt{lattice40}. $\phib$ vs iteration. $\phib$ decreases overall but exhibits plateaus and jumps, reflecting limited large-scale rearrangement.}
 \label{fig:lattice40_iter}
 \end{figure}
 
@@ -372,15 +370,15 @@ For $N{=}40$ ensembles we show $\Delta x = 10^{-2}$, and for $N{=}400$ we show $
 \includegraphics[width=\textwidth]{figures/lattice40_dx0.01_phib_vs_phase1.png}
 \caption{Phase I.}
 \end{subfigure}
-\caption{\texttt{lattice40}, $\Delta x{=}10^{-2}$. Correlations between $\phib$ and compressed size are moderate and may fall below the preregistered $|r|\ge0.7$ bar, making \texttt{lattice40} a rejection case under F3. Baseline geometric metrics perform comparably here.}
+\caption{\texttt{lattice40}, $\Delta x{=}10^{-2}$. Correlations between $\phib$ and compressed size are moderate compared to other ensembles. In some $\Delta x$ settings they fall below the preregistered $|r|\ge0.7$ bar, making \texttt{lattice40} a rejection case under F3. Baseline geometric metrics perform comparably or better, indicating $\phib$ is not uniquely informative for this already structured initial lattice-like configuration.}
 \label{fig:lattice40_corr}
 \end{figure}
 
-\subsection{blobs40 ($N{=}40$, $\Delta x = 10^{-2}$)}
+\subsection{\texttt{blobs40} ($N{=}40$, $\Delta x = 10^{-2}$)}
 \begin{figure}[h!]
 \centering
 \includegraphics[width=0.6\textwidth]{figures/blobs40_dx0.01_phib_vs_iter.png}
-\caption{$\phib$ vs iteration for \texttt{blobs40}, showing monotone reduction under backtracked descent.}
+\caption{\texttt{blobs40}. $\phib$ vs iteration, showing monotone reduction under backtracked descent.}
 \label{fig:blobs40_iter}
 \end{figure}
 
@@ -398,15 +396,15 @@ For $N{=}40$ ensembles we show $\Delta x = 10^{-2}$, and for $N{=}400$ we show $
 \includegraphics[width=\textwidth]{figures/blobs40_dx0.01_phib_vs_phase1.png}
 \caption{Phase I.}
 \end{subfigure}
-\caption{\texttt{blobs40}, $\Delta x{=}10^{-2}$. Both fixed-order and shuffled-order compressed sizes track $\phib$ with very large $|r|$, and this persists across $\Delta x$. Baselines (nearest-neighbor distance, etc.) are also strong here, but $\phib$ remains competitive.}
+\caption{\texttt{blobs40}, $\Delta x{=}10^{-2}$. Both fixed-order and shuffled-order compressed sizes track $\phib$ with very large $|r|$, and this persists across $\Delta x$. Baseline geometric metrics (e.g.\ mean nearest-neighbor distance) are also strong here, but $\phib$ remains competitive.}
 \label{fig:blobs40_corr}
 \end{figure}
 
-\subsection{uniform400 ($N{=}400$, $\Delta x = 10^{-3}$)}
+\subsection{\texttt{uniform400} ($N{=}400$, $\Delta x = 10^{-3}$)}
 \begin{figure}[h!]
 \centering
 \includegraphics[width=0.6\textwidth]{figures/uniform400_dx0.001_phib_vs_iter.png}
-\caption{$\phib$ vs iteration for \texttt{uniform400}. Even at $N{=}400$, backtracking enforces monotone descent.}
+\caption{\texttt{uniform400}. $\phib$ vs iteration. Even at $N{=}400$, backtracking enforces monotone descent.}
 \label{fig:uniform400_iter}
 \end{figure}
 
@@ -424,7 +422,7 @@ For $N{=}40$ ensembles we show $\Delta x = 10^{-2}$, and for $N{=}400$ we show $
 \includegraphics[width=\textwidth]{figures/uniform400_dx0.001_phib_vs_phase1.png}
 \caption{Phase I.}
 \end{subfigure}
-\caption{\texttt{uniform400}, $\Delta x{=}10^{-3}$. $\phib$ and compressed size exhibit an almost perfectly monotonic relationship (Pearson $|r|\approx 1$). This persists after shuffling particle order, and $\phib$ matches or exceeds naive geometric baselines.}
+\caption{\texttt{uniform400}, $\Delta x{=}10^{-3}$. $\phib$ and compressed size exhibit an almost perfectly monotonic relationship (Pearson $|r|\approx 1$). This persists after shuffling particle order (Phase IIb), and $\phib$ matches or exceeds naive geometric baselines (radius of gyration, nearest-neighbor distance, coordinate variance).}
 \label{fig:uniform400_corr}
 \end{figure}
 
@@ -434,11 +432,11 @@ For $N{=}40$ ensembles we show $\Delta x = 10^{-2}$, and for $N{=}400$ we show $
 \subsection{What has been shown}
 The experimental loop demonstrates three things.
 
-First, we can \emph{actually run} a specified surrogate $\phib$, evolve systems by explicit descent in $\phib$, and log snapshots and compressed sizes in a way that can either vindicate or kill the surrogate for each ensemble. This answers the reviewer demand for preregistered falsifiers that are empirically checkable.
+First, we can \emph{actually run} a specified surrogate $\phib$, evolve systems by explicit descent in $\phib$, and log snapshots and compressed sizes in a way that can either vindicate or kill the surrogate for each ensemble. This answers the demand for preregistered falsifiers that are empirically checkable.
 
 Second, for several ensembles (notably \texttt{uniform40}, \texttt{blobs40}, and especially \texttt{uniform400}), $\phib$ strongly predicts not only a pair-structure-aware ``Phase I'' compressed size, but also a coordinate-only compressed size (Phase IIa). Crucially, this relationship survives in Phase IIb, where we shuffle particle order before compression to break trivial ordering patterns. Phase IIb directly addresses the ``Phase II is not blind'' objection.
 
-Third, not all ensembles behave equally. In \texttt{lattice40}, correlations are weaker and fall below a preregistered $|r|\ge 0.7$ bar. We include it anyway and label it a rejection case. This is essential: if the method only ever gave pretty plots, it would not be science.
+Third, not all ensembles behave equally. In \texttt{lattice40}, correlations are weaker and fall below a preregistered $|r|\ge 0.7$ bar for some tested $\Delta x$. We include it anyway and label it a rejection case. This is essential: if the method only ever gave pretty plots, it would not be science.
 
 \subsection{What has \emph{not} been claimed}
 We have not claimed:
