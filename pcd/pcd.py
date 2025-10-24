@@ -1,393 +1,353 @@
 #!/usr/bin/env python3
+"""
+Predictive Compression Dynamics (PCD)
+Phase I / Phase II / Baselines / Controls / Quantization Ablation
+"""
+
 import numpy as np
-import matplotlib.pyplot as plt
 import gzip
-import struct
-import os
+import io
+import matplotlib.pyplot as plt
+from scipy.spatial import distance_matrix
 from scipy.stats import pearsonr
 
-# ============================================================
-# Preregister-style global knobs
-# ============================================================
+np.random.seed(0)
 
-SEED = 0                   # fixed RNG seed
-DT_INIT = 0.05             # initial trial step size for gradient step
-BACKTRACK_ITERS = 10       # max halvings in backtracking line search
-STEPS = 400                # number of iterations for N=40 runs
-STEPS_LARGE = 400          # same for N=400 run
-RECORD_STRIDE = 5          # record snapshots every k steps
-SUBSAMPLE_STRIDE = 20      # use every k-th recorded snapshot in stats (reduce autocorr)
-A_SOFT = 0.05              # softening length "a" in sqrt(r^2 + a^2)
-DX_QUANT = 0.01            # quantization for Phase II coordinate gzip
-BINS_MIN = 0.0             # Phase I histogram lower bound
-BINS_MAX = 2.0             # Phase I histogram upper bound
-NBINS = 33                 # number of Phase I histogram bins
+# ================================================================
+# Surrogate Φ_b
+# ================================================================
+def phi_b(x, a=0.05):
+    """Compute surrogate Φ_b = Σ_{i<j} 1/sqrt(r_ij^2 + a^2)."""
+    d = distance_matrix(x, x)
+    iu = np.triu_indices(len(x), 1)
+    r = d[iu]
+    return np.sum(1.0 / np.sqrt(r * r + a * a))
 
-OUTDIR = "figures"
-os.makedirs(OUTDIR, exist_ok=True)
 
-rng = np.random.default_rng(SEED)
+def grad_phi_b(x, a=0.05):
+    """Gradient of Φ_b (attractive flow direction is -∇Φ_b)."""
+    N = len(x)
+    grad = np.zeros_like(x)
+    for i in range(N):
+        diff = x[i] - x                # shape (N,3)
+        r2 = np.sum(diff**2, axis=1) + a * a
+        r3 = r2**1.5                   # (r^2 + a^2)^{3/2}
+        grad[i] = np.sum(diff / r3[:, None], axis=0)
+    # Return -∇Φ_b, i.e. the force-like direction that lowers Φ_b
+    return -grad
 
-# ============================================================
-# Surrogate Phi_b and its gradient
-# ============================================================
 
-def phi_and_forces(x, a_soft=A_SOFT):
+# ================================================================
+# Baseline geometric metrics
+# ================================================================
+def radius_of_gyration(x):
+    """Root mean square distance from centroid."""
+    c = np.mean(x, axis=0)
+    return np.sqrt(np.mean(np.sum((x - c) ** 2, axis=1)))
+
+
+def mean_nearest_neighbor(x):
+    """Average nearest-neighbor distance."""
+    d = distance_matrix(x, x)
+    np.fill_diagonal(d, np.inf)
+    return np.mean(np.min(d, axis=1))
+
+
+def coordinate_variance(x):
+    """Variance of coordinates (flattened)."""
+    return np.var(x)
+
+
+# ================================================================
+# Compression utilities
+# ================================================================
+def gzip_bytes(b):
+    with io.BytesIO() as buf:
+        with gzip.GzipFile(fileobj=buf, mode="wb", compresslevel=6) as f:
+            f.write(b)
+        return len(buf.getvalue())
+
+
+def phase1_histogram_encoder(x, bins=64):
     """
-    x: (N,3) array of particle positions.
-    Returns:
-        phi : scalar (our surrogate Φ_b)
-        F   : (N,3) array = -∇Φ_b  (attractive soft-core pair force).
-    We include *all* pairs (i<j).
+    Phase I encoder: pairwise distance histogram -> gzip.
+    Does NOT depend on coordinate ordering.
     """
-    diffs = x[:, None, :] - x[None, :, :]        # (N,N,3)
-    dist2 = np.sum(diffs**2, axis=2)             # (N,N)
-    dist2_soft = dist2 + a_soft**2
+    d = distance_matrix(x, x)
+    iu = np.triu_indices(len(x), 1)
+    hist, _ = np.histogram(d[iu], bins=bins, range=(0, np.max(d)))
+    return gzip_bytes(hist.tobytes())
 
-    N = x.shape[0]
-    idx = np.arange(N)
-    dist2_soft[idx, idx] = np.inf  # kill self-terms
 
-    inv_sqrt = 1.0 / np.sqrt(dist2_soft)         # 1/sqrt(r^2+a^2)
-    phi = np.sum(np.triu(inv_sqrt, k=1))         # sum over i<j only
-
-    inv32 = dist2_soft**(-1.5)                   # 1/(r^2+a^2)^(3/2)
-    inv32[idx, idx] = 0.0
-
-    # F_i = - Σ_j (x_i - x_j)/(r^2+a^2)^(3/2)
-    F = -np.einsum('ij,ijx->ix', inv32, diffs)   # shape (N,3)
-    return phi, F
-
-# ============================================================
-# Initial configurations
-# ============================================================
-
-def init_uniform(N):
-    # uniform in cube [-1,1]^3
-    return rng.uniform(-1.0, 1.0, size=(N,3))
-
-def init_lattice(N):
-    # nearly cubic lattice (with a tiny jitter)
-    n = int(np.ceil(N ** (1.0/3.0)))
-    coords = []
-    lin = np.linspace(-1.0, 1.0, n)
-    for xi in lin:
-        for yi in lin:
-            for zi in lin:
-                coords.append([xi, yi, zi])
-    coords = np.array(coords)[:N]
-    coords += rng.normal(scale=0.05, size=coords.shape)
-    return coords
-
-def init_blobs(N):
-    # two Gaussian blobs
-    half = N//2
-    c1 = np.array([-0.5, 0.0, 0.0])
-    c2 = np.array([ 0.5, 0.0, 0.0])
-    blob1 = c1 + rng.normal(scale=0.2, size=(half,3))
-    blob2 = c2 + rng.normal(scale=0.2, size=(N-half,3))
-    return np.vstack([blob1, blob2])
-
-def init_uniform_large(N):
-    return init_uniform(N)
-
-# ============================================================
-# One gradient-descent step with backtracking line search
-# Ensures Φ_b(new) <= Φ_b(old), so Φ_b is discrete-time Lyapunov.
-# ============================================================
-
-def gradient_step_backtrack(x, dt_init):
+def phase2_coordinate_encoder(x, dx=1e-2, shuffle=False):
     """
-    x: (N,3) current coords
-    dt_init: trial step size
-    Returns:
-        x_new, phi_new
-    Procedure:
-        - compute phi,F at x
-        - try x - dt_init * gradΦ_b. But F = -∇Φ_b, so x + dt_init * F.
-        - if Φ_b decreases, accept
-        - else halve dt and retry, up to BACKTRACK_ITERS
-    """
-    phi_old, F = phi_and_forces(x)
-    dt = dt_init
-    for _ in range(BACKTRACK_ITERS):
-        x_trial = x + dt * F
-        phi_trial, _ = phi_and_forces(x_trial)
-        if phi_trial <= phi_old:
-            return x_trial, phi_trial
-        dt *= 0.5
-    # If still not improved, fall back to a very small step
-    x_trial = x + (dt * F)
-    phi_trial, _ = phi_and_forces(x_trial)
-    # We will accept even if tiny increase, but typically this won't happen
-    return x_trial, phi_trial
+    Phase II encoder: quantized coordinates -> gzip.
 
-# ============================================================
-# Integrator loop
-# ============================================================
+    Phase IIa: shuffle=False (fixed particle order)
+    Phase IIb: shuffle=True  (random permutation of particle order)
 
-def run_simulation(x0, steps, dt_init, record_stride):
+    Reviewer control: Phase IIb tests whether gzip gains are just
+    ordering artifacts rather than true spatial regularity.
     """
-    Performs a monotonic-descent evolution of Φ_b via backtracking.
-    Records snapshots every record_stride.
-    Returns:
-      iters_list: recorded iteration indices
-      phi_list:   Φ_b at those iterations
-      coords_list: corresponding coordinates (N,3)
+    q = np.round(x / dx).astype(np.int32)
+    if shuffle:
+        q = q.copy()
+        np.random.shuffle(q)  # permute particle order
+    return gzip_bytes(q.tobytes())
+
+
+# ================================================================
+# Gradient descent with backtracking
+# ================================================================
+def run_dynamics(x0, steps=400, a=0.05, eta0=0.05):
+    """
+    Gradient descent with backtracking line search to enforce
+    monotone nonincreasing Φ_b. Returns Φ_b trace and snapshots.
     """
     x = x0.copy()
-    iters_list = []
-    phi_list = []
-    coords_list = []
+    phis = [phi_b(x, a)]
+    snapshots = [x.copy()]
+    for t in range(steps):
+        g = grad_phi_b(x, a)   # this is -∇Φ_b
+        eta = eta0
+        # backtracking line search
+        while True:
+            x_new = x - eta * g
+            if phi_b(x_new, a) <= phis[-1]:
+                break
+            eta *= 0.5
+            if eta < 1e-6:
+                break
+        x = x_new
+        phis.append(phi_b(x, a))
+        snapshots.append(x.copy())
+    return np.array(phis), snapshots
 
-    # record t=0
-    phi_now, _ = phi_and_forces(x)
-    iters_list.append(0)
-    phi_list.append(phi_now)
-    coords_list.append(x.copy())
 
-    for t in range(1, steps+1):
-        # backtracking step
-        x, phi_now = gradient_step_backtrack(x, dt_init)
+# ================================================================
+# Ensemble generators
+# ================================================================
+def make_uniform(N):
+    """Uniform points in [0,1]^3."""
+    return np.random.rand(N, 3)
 
-        # record occasionally
-        if t % record_stride == 0:
-            iters_list.append(t)
-            phi_list.append(phi_now)
-            coords_list.append(x.copy())
 
-    return np.array(iters_list), np.array(phi_list), coords_list
-
-# ============================================================
-# Compression: Phase I (pair-distance histogram code)
-# ============================================================
-
-def serialize_phase1_pairhist(coords, bin_edges):
+def make_lattice(N):
     """
-    Phase I surrogate compressor:
-      - compute all pairwise distances r_ij
-      - bin them
-      - store (count, mean residual) per bin
-    Serialize -> gzip -> return compressed size in bytes.
+    Regular grid (roughly cubic), then add small Gaussian jitter.
+    Works for arbitrary N by oversampling ceil(m^3) and truncating.
     """
-    N = coords.shape[0]
-    diffs = coords[:,None,:] - coords[None,:,:]
-    dist = np.sqrt(np.sum(diffs**2, axis=2))
-    iu, ju = np.triu_indices(N, k=1)
-    r = dist[iu, ju]
+    m = int(np.ceil(N ** (1.0 / 3.0)))
+    xs = np.linspace(0, 1, m)
+    ys = np.linspace(0, 1, m)
+    zs = np.linspace(0, 1, m)
+    gx, gy, gz = np.meshgrid(xs, ys, zs, indexing='ij')
+    pts = np.stack([gx, gy, gz], axis=-1).reshape(-1, 3)
+    pts = pts[:N]
+    noise = 0.02 * np.random.randn(N, 3)
+    return pts + noise
 
-    bin_idx = np.digitize(r, bin_edges) - 1
-    nbins = len(bin_edges) - 1
-    bin_centers = 0.5*(bin_edges[:-1] + bin_edges[1:])
 
-    counts = np.zeros(nbins, dtype=np.int32)
-    residuals = np.zeros(nbins, dtype=np.float32)
+def make_blobs(N):
+    """Two clusters: one near origin, one shifted along x."""
+    half = N // 2
+    a = 0.1 * np.random.randn(half, 3)
+    b = 0.1 * np.random.randn(N - half, 3) + np.array([1.0, 0.0, 0.0])
+    return np.vstack([a, b])
 
-    for k in range(nbins):
-        mask = (bin_idx == k)
-        counts[k] = np.sum(mask)
-        if counts[k] > 0:
-            residuals[k] = np.mean(r[mask] - bin_centers[k])
-        else:
-            residuals[k] = 0.0
 
-    buf = struct.pack('<i', nbins)
-    for k in range(nbins):
-        buf += struct.pack('<if', int(counts[k]), float(residuals[k]))
-    compressed = gzip.compress(buf)
-    return len(compressed)
+ENSEMBLES = {
+    "uniform40":   lambda: make_uniform(40),
+    "lattice40":   lambda: make_lattice(40),
+    "blobs40":     lambda: make_blobs(40),
+    "uniform400":  lambda: make_uniform(400),
+}
 
-# ============================================================
-# Compression: Phase II (raw quantized coordinates only)
-# ============================================================
 
-def serialize_phase2_coords(coords, dx_quant=DX_QUANT):
+# ================================================================
+# Correlation helper
+# ================================================================
+def safe_corr(x, y):
     """
-    Phase II compressor:
-      - quantize coordinates to int grid
-      - serialize raw integer table
-      - gzip
-    This does NOT explicitly encode pairwise structure.
+    Return (Pearson r, p). If either input has zero variance, return (0,1).
+    We mostly care about r as an effect size.
     """
-    N = coords.shape[0]
-    q = np.round(coords / dx_quant).astype(np.int32)
-    buf = struct.pack('<i', N)
-    buf += q.astype(np.int32).tobytes(order='C')
-    compressed = gzip.compress(buf)
-    return len(compressed)
+    if np.std(x) == 0 or np.std(y) == 0:
+        return 0.0, 1.0
+    return pearsonr(x, y)
 
-# ============================================================
-# Evaluate snapshots: compute Φ_b, Phase I size, Phase II size;
-# sub-sample for correlation statistics
-# ============================================================
 
-def evaluate_snapshots(iters_list, phi_list, coords_list,
-                       bin_edges, subsample_stride=SUBSAMPLE_STRIDE):
-    phase1_sizes = []
-    phase2_sizes = []
-    for coords in coords_list:
-        nbytes1 = serialize_phase1_pairhist(coords, bin_edges)
-        nbytes2 = serialize_phase2_coords(coords)
-        phase1_sizes.append(nbytes1)
-        phase2_sizes.append(nbytes2)
-
-    iters_arr = np.array(iters_list)
-    phi_arr = np.array(phi_list)
-    phase1_arr = np.array(phase1_sizes)
-    phase2_arr = np.array(phase2_sizes)
-
-    # Subsample to mitigate temporal autocorrelation
-    mask = (iters_arr % subsample_stride == 0)
-    phi_sub = phi_arr[mask]
-    p1_sub = phase1_arr[mask]
-    p2_sub = phase2_arr[mask]
-
-    # Pearson correlations
-    # Note: sign may be +/-; we only test monotonic association strength.
-    if len(phi_sub) > 1:
-        r_p1, p_p1 = pearsonr(phi_sub, p1_sub)
-        r_p2, p_p2 = pearsonr(phi_sub, p2_sub)
-    else:
-        r_p1, p_p1, r_p2, p_p2 = np.nan, np.nan, np.nan, np.nan
-
-    return {
-        "iters": iters_arr,
-        "phi": phi_arr,
-        "phase1": phase1_arr,
-        "phase2": phase2_arr,
-        "iters_sub": iters_arr[mask],
-        "phi_sub": phi_sub,
-        "phase1_sub": p1_sub,
-        "phase2_sub": p2_sub,
-        "r_phase1": r_p1,
-        "p_phase1": p_p1,
-        "r_phase2": r_p2,
-        "p_phase2": p_p2,
-    }
-
-# ============================================================
-# Plotting
-# ============================================================
-
-def plot_phi_vs_iter(name, results, outdir=OUTDIR):
-    it = results["iters"]
-    phi = results["phi"]
-
-    plt.figure(figsize=(6,4))
-    plt.plot(it, phi, marker='o', ms=3)
-    plt.xlabel("iteration")
-    plt.ylabel(r"$\Phi_b$")
-    plt.title(f"{name}: surrogate $\\Phi_b$ vs iteration")
-    plt.tight_layout()
-    fname = os.path.join(outdir, f"{name}_phib_vs_iter.png")
-    plt.savefig(fname, dpi=150)
-    plt.close()
-
-def plot_compression_vs_phi(name, results, which="phase1", outdir=OUTDIR):
-    it = results["iters"]
-    phi = results["phi"]
-
-    if which == "phase1":
-        comp = results["phase1"]
-        ylabel = "Phase I compressed bytes (pair-hist gzip)"
-    else:
-        comp = results["phase2"]
-        ylabel = "Phase II compressed bytes (coord gzip)"
-
-    plt.figure(figsize=(6,4))
-    sc = plt.scatter(phi, comp, c=it, cmap='viridis', s=18)
-    cbar = plt.colorbar(sc)
-    cbar.set_label("iteration (earlier=lighter)")
-    plt.xlabel(r"$\Phi_b$")
-    plt.ylabel(ylabel)
-    plt.title(f"{name}: {ylabel} vs $\\Phi_b$")
-    plt.tight_layout()
-    fname = os.path.join(outdir, f"{name}_phib_vs_{which}.png")
-    plt.savefig(fname, dpi=150)
-    plt.close()
-
-# ============================================================
-# One full experiment for an ensemble
-# ============================================================
-
-def run_experiment(name, init_func, N, steps):
-    x0 = init_func(N)
-    iters_list, phi_list, coords_list = run_simulation(
-        x0,
-        steps=steps,
-        dt_init=DT_INIT,
-        record_stride=RECORD_STRIDE
-    )
-
-    # define Phase I histogram bins
-    bin_edges = np.linspace(BINS_MIN, BINS_MAX, NBINS+1)
-
-    results = evaluate_snapshots(
-        iters_list,
-        phi_list,
-        coords_list,
-        bin_edges=bin_edges,
-        subsample_stride=SUBSAMPLE_STRIDE
-    )
-
-    # plots
-    plot_phi_vs_iter(name, results)
-    plot_compression_vs_phi(name, results, which="phase1")
-    plot_compression_vs_phi(name, results, which="phase2")
-
-    return results
-
-# ============================================================
-# Main
-# ============================================================
-
+# ================================================================
+# Main experiment
+# ================================================================
 def main():
-    # N=40 cases
-    res_uniform40 = run_experiment("uniform40", init_uniform, N=40, steps=STEPS)
-    res_lattice40 = run_experiment("lattice40", init_lattice, N=40, steps=STEPS)
-    res_blobs40   = run_experiment("blobs40",   init_blobs,   N=40, steps=STEPS)
+    results = []
 
-    # scaling case: N=400 uniform
-    res_uniform400 = run_experiment("uniform400", init_uniform_large, N=400, steps=STEPS_LARGE)
+    for name, gen in ENSEMBLES.items():
+        x0 = gen()
+        phis, snaps = run_dynamics(x0)
 
-    # Summaries
-    def summarize(name, N, R):
-        return {
-            "name": name,
-            "N": N,
-            "r_phase1": R["r_phase1"],
-            "p_phase1": R["p_phase1"],
-            "r_phase2": R["r_phase2"],
-            "p_phase2": R["p_phase2"],
-            "n_subsamples": len(R["phi_sub"])
-        }
+        n_snaps = len(snaps)
+        # Subsample every 20th snapshot to reduce temporal autocorrelation
+        idx = np.arange(0, n_snaps, 20)
+        phis_sub = phis[idx]
 
-    rows = [
-        summarize("uniform40", 40, res_uniform40),
-        summarize("lattice40", 40, res_lattice40),
-        summarize("blobs40",   40, res_blobs40),
-        summarize("uniform400",400, res_uniform400),
-    ]
+        # Phase I encoder (pair-distance histogram, no dx dependence)
+        c1 = [phase1_histogram_encoder(snaps[i]) for i in idx]
 
-    print("")
-    print("Summary (subsampled every {} iterations to reduce temporal autocorrelation):".format(SUBSAMPLE_STRIDE))
-    print("{:12s} {:>5s} {:>5s} {:>12s} {:>12s} {:>12s} {:>12s}".format(
-        "ensemble","N","n_eff","r_phase1","p_phase1","r_phase2","p_phase2"
-    ))
-    for row in rows:
-        print("{:12s} {:5d} {:5d} {:12.3f} {:12.2e} {:12.3f} {:12.2e}".format(
-            row["name"], row["N"], row["n_subsamples"],
-            row["r_phase1"], row["p_phase1"],
-            row["r_phase2"], row["p_phase2"]
-        ))
+        # We'll sweep Δx to test quantization sensitivity (Phase II encoders)
+        deltas = [1e-1, 1e-2, 1e-3]
+        for dx in deltas:
+            # Phase IIa = coordinate gzip, fixed order
+            c2 = [phase2_coordinate_encoder(snaps[i], dx=dx, shuffle=False) for i in idx]
+            # Phase IIb = coordinate gzip, shuffled order
+            c2s = [phase2_coordinate_encoder(snaps[i], dx=dx, shuffle=True)  for i in idx]
 
-    print("\nPhase I = pair-distance histogram code + gzip (explicitly encodes pair structure).")
-    print("Phase II = raw quantized coordinates + gzip (no explicit pair structure).")
-    print("r_phase1 / r_phase2 = Pearson correlation between Φ_b and compressed size,")
-    print("computed only on subsampled snapshots (to partially decorrelate time).")
-    print("Φ_b(t) is enforced monotone nonincreasing by backtracking line search,")
-    print("so each run supplies a discrete-time Lyapunov-style descent curve.")
-    print(f"Figures saved in: {OUTDIR}/")
+            # Correlations of Φ_b with each compressed-size estimate
+            r1, _  = safe_corr(phis_sub, c1)   # Φ_b vs Phase I
+            r2, _  = safe_corr(phis_sub, c2)   # Φ_b vs Phase IIa
+            r2s, _ = safe_corr(phis_sub, c2s)  # Φ_b vs Phase IIb
+
+            # Baselines vs Phase IIa (the external compressor target)
+            rg   = [radius_of_gyration(snaps[i])    for i in idx]
+            nnd  = [mean_nearest_neighbor(snaps[i]) for i in idx]
+            varc = [coordinate_variance(snaps[i])   for i in idx]
+
+            rb_rg,  _  = safe_corr(rg,  c2)
+            rb_nnd, _  = safe_corr(nnd, c2)
+            rb_var, _  = safe_corr(varc, c2)
+
+            results.append(
+                (name,
+                 len(snaps[0]),
+                 dx,
+                 len(idx),
+                 r1,
+                 r2,
+                 r2s,
+                 rb_rg,
+                 rb_nnd,
+                 rb_var)
+            )
+
+            # ---------- Plot base name ----------
+            fig_base = f"figures/{name}_dx{dx:g}"
+
+            # ---------- Plot 1: Φ_b vs iteration ----------
+            # (Yes, we will regenerate/overwrite this per dx, which is harmless.
+            #  This preserves filenames matching dx in the paper.)
+            plt.figure()
+            plt.plot(phis, marker='o', markersize=2, linewidth=1)
+            plt.xlabel("Iteration")
+            plt.ylabel("Φ_b")
+            plt.title(f"{name}: Φ_b vs iteration")
+            plt.tight_layout()
+            plt.savefig(f"{fig_base}_phib_vs_iter.png", dpi=150)
+            plt.close()
+
+            # ---------- Plot 2: Φ_b vs Phase I compressed size ----------
+            # Internal-consistency check: pair-distance histogram encoder
+            plt.figure()
+            plt.scatter(phis_sub, c1, c=idx, cmap="cividis", s=30)
+            plt.xlabel("Φ_b")
+            plt.ylabel("Phase I (pairwise histogram gzip) bytes")
+            plt.title(f"{name}, Δx={dx:g}: Φ_b vs Phase I (r={r1:.3f})")
+            cbar = plt.colorbar()
+            cbar.set_label("Iteration index")
+            plt.tight_layout()
+            plt.savefig(f"{fig_base}_phib_vs_phase1.png", dpi=150)
+            plt.close()
+
+            # ---------- Plot 3: Φ_b vs Phase IIa compressed size ----------
+            # External compressor, fixed particle order
+            plt.figure()
+            plt.scatter(phis_sub, c2, c=idx, cmap="viridis", s=30)
+            plt.xlabel("Φ_b")
+            plt.ylabel("Phase IIa compressed size (bytes)")
+            plt.title(f"{name}, Δx={dx:g}: Φ_b vs Phase IIa (r={r2:.3f})")
+            cbar = plt.colorbar()
+            cbar.set_label("Iteration index")
+            plt.tight_layout()
+            plt.savefig(f"{fig_base}_phib_vs_phase2a.png", dpi=150)
+            plt.close()
+
+            # ---------- Plot 4: Φ_b vs Phase IIb compressed size ----------
+            # External compressor, shuffled particle order (ordering control)
+            plt.figure()
+            plt.scatter(phis_sub, c2s, c=idx, cmap="plasma", s=30)
+            plt.xlabel("Φ_b")
+            plt.ylabel("Phase IIb shuffled compressed size (bytes)")
+            plt.title(f"{name}, Δx={dx:g}: Φ_b vs Phase IIb (r={r2s:.3f})")
+            cbar = plt.colorbar()
+            cbar.set_label("Iteration index")
+            plt.tight_layout()
+            plt.savefig(f"{fig_base}_phib_vs_phase2b.png", dpi=150)
+            plt.close()
+
+        print(f"{name} done.")
+
+    # ========== Summary table ==========
+    print("\nSummary (decorrelated snapshots every 20th):")
+    header = (
+        "ensemble",
+        "N",
+        "Δx",
+        "n_eff",
+        "r_PhI",
+        "r_PhIIa",
+        "r_PhIIb",
+        "r_Rg",
+        "r_NND",
+        "r_Var",
+    )
+    print(
+        "{:<12s} {:>5s} {:>6s} {:>6s} {:>8s} {:>8s} {:>8s} {:>8s} {:>8s} {:>8s}".format(
+            *header
+        )
+    )
+
+    for (
+        ens,
+        Nval,
+        dx,
+        neff,
+        r1,
+        r2,
+        r2s,
+        rb_rg,
+        rb_nnd,
+        rb_var,
+    ) in results:
+        print(
+            "{:<12s} {:>5d} {:>6.0e} {:>6d} {:>8.3f} {:>8.3f} {:>8.3f} {:>8.3f} {:>8.3f} {:>8.3f}".format(
+                ens,
+                Nval,
+                dx,
+                neff,
+                r1,
+                r2,
+                r2s,
+                rb_rg,
+                rb_nnd,
+                rb_var,
+            )
+        )
+
+    print(
+        "\nPhase I  = pair-distance histogram encoder (explicit pair structure)."
+    )
+    print(
+        "Phase IIa = coordinate encoder (fixed order gzip on quantized coords)."
+    )
+    print(
+        "Phase IIb = shuffled-coordinate encoder (random order gzip) as an ordering control."
+    )
+    print(
+        "r_Rg / r_NND / r_Var are baseline correlations of simple geometric metrics "
+        "with Phase IIa compressed size."
+    )
+    print("Figures saved under ./figures/")
+
 
 if __name__ == "__main__":
     main()
